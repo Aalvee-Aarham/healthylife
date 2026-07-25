@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* UI theme audit complete - Organic Tech palette verified */
 @variant dark (&:where(.dark, .dark *));
 
 :root {

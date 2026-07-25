@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, Droplet, Utensils, Dumbbell, Activity, Heart, Check } from 'lucide-react';
 import { SymptomLog } from '../types';
 
+// Connected to global nutrition state
+
 interface QuickLogModalProps {
   isOpen: boolean;
   onClose: () => void;

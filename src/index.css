@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+  --color-surface: #f8faf9;
+  --color-surface-dim: #d8dada;
+  --color-surface-bright: #f8faf9;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f3;
+  --color-surface-container: #eceeed;
+  --color-surface-container-high: #e6e9e8;
+  --color-surface-container-highest: #e1e3e2;
+  --color-on-surface: #191c1c;
+  --color-on-surface-variant: #404943;
+  --color-outline: #707973;
+  --color-outline-variant: #bfc9c1;
+  --color-primary: #0f5238;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2d6a4f;
+  --color-on-primary-container: #a8e7c5;
+  --color-secondary: #4c6452;
+  --color-secondary-container: #cce6d0;
+  --color-on-secondary-container: #506856;
+  --color-tertiary: #802a20;
+  --color-background: #f8faf9;
+  --color-on-background: #191c1c;
+}
+
+@layer base {
+  html, body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f8faf9;
+    color: #191c1c;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  html.dark, body.dark {
+    background-color: #0f1715;
+    color: #eff1f0;
+  }
+}
+
+/* Organic Tech Custom Utility Classes */
+.bg-organic-surface {
+  background-color: #f8faf9;
+}
+
+.dark .bg-organic-surface {
+  background-color: #0f1715;
+}
+
+.bg-organic-card {
+  background-color: #ffffff;
+}
+
+.dark .bg-organic-card {
+  background-color: #16221f;
+}
+
+.border-organic {
+  border-color: #e1e3e2;
+}
+
+.dark .border-organic {
+  border-color: #263833;
+}
+
+.shadow-organic {
+  box-shadow: 0px 10px 30px rgba(15, 82, 56, 0.05);
+}
+
+.dark .shadow-organic {
+  box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.glass-organic {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dark .glass-organic {
+  background: rgba(22, 34, 31, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+

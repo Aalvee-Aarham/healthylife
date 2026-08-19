@@ -1,284 +1,274 @@
-import React, { useState } from 'react';
-import { NavigationTab, UserProfile, UserRole } from '../types';
-import { 
-  Home, 
-  LayoutDashboard, 
-  UtensilsCrossed, 
-  Dumbbell, 
-  Sparkles, 
-  Users, 
-  Briefcase, 
-  Plus, 
-  Bell, 
-  ShieldCheck, 
-  User, 
-  ChevronDown,
-  Sun,
-  Moon,
+import React from 'react';
+import { NavigationTab, UserProfile } from '../types';
+import {
+  Home,
+  LayoutDashboard,
+  UtensilsCrossed,
+  Dumbbell,
+  Sparkles,
+  Briefcase,
+  Plus,
+  User,
   LogOut,
   Zap,
-  Sliders,
-  CheckCircle2,
+  FileText,
+  MessageSquare,
+  Droplet,
+  Video,
+  Users,
   X,
-  Menu,
-  Activity,
-  FileText
 } from 'lucide-react';
 
 interface SidebarProps {
   currentTab: NavigationTab;
   onSelectTab: (tab: NavigationTab) => void;
   user: UserProfile;
-  isLoggedIn: boolean;
-  theme: 'light' | 'dark';
-  onToggleTheme: () => void;
   onOpenQuickLog: () => void;
-  onSelectRole: (role: UserRole) => void;
   onLogout: () => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
+}
+
+interface NavItem {
+  id: NavigationTab;
+  label: string;
+  icon: React.ElementType;
+  badge?: string;
+  color?: string;
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onSelectTab,
   user,
-  isLoggedIn,
-  theme,
-  onToggleTheme,
   onOpenQuickLog,
-  onSelectRole,
   onLogout,
   isOpenMobile,
-  onCloseMobile
+  onCloseMobile,
 }) => {
-  const [showRoleSelector, setShowRoleSelector] = useState(false);
-
-  interface NavGroup {
-    title: string;
-    items: {
-      id: NavigationTab;
-      label: string;
-      icon: any;
-      badge?: string;
-    }[];
-  }
-
-  // Member Groups
   const memberGroups: NavGroup[] = [
     {
       title: 'CORE WELLNESS',
       items: [
-        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-        { id: 'nutrition', label: 'Nutrition & Macros', icon: UtensilsCrossed },
-        { id: 'workouts', label: 'Workouts & Sculpt', icon: Dumbbell },
-        { id: 'cycle', label: 'CycleSync™ Phase', icon: Sparkles, badge: 'Day 14' }
-      ]
+        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, color: 'var(--hl-green)' },
+        { id: 'nutrition', label: 'Nutrition & Macros', icon: UtensilsCrossed, color: 'var(--hl-teal)' },
+        { id: 'workouts', label: 'Gym & Workouts', icon: Dumbbell, color: 'var(--hl-peach)' },
+      ],
     },
     {
-      title: 'INTELLIGENCE & COMMUNITY',
+      title: 'CONNECT',
       items: [
-        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap },
-        { id: 'community', label: 'Community Feed', icon: Users }
-      ]
-    }
+        { id: 'chat', label: 'Chat with Coach', icon: MessageSquare, color: 'var(--hl-green)' },
+        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)' },
+        ...(user.gender !== 'male'
+          ? [
+              {
+                id: 'cycle' as NavigationTab,
+                label: 'CycleSync™ Phase',
+                icon: Sparkles,
+                badge: user.cycleDay ? `Day ${user.cycleDay}` : undefined,
+                color: 'var(--hl-lavender)',
+              },
+            ]
+          : []),
+      ],
+    },
   ];
 
-  // Coach Groups
   const coachGroups: NavGroup[] = [
     {
       title: 'COACHING MANAGEMENT',
       items: [
-        { id: 'coach-dashboard', label: 'Coach Portal', icon: Briefcase },
-        { id: 'clients', label: 'Client Roster', icon: Users },
-        { id: 'consultations', label: 'Live Consultations', icon: Bell }
-      ]
+        { id: 'coach-dashboard', label: 'Coach Portal', icon: Briefcase, color: 'var(--hl-green)' },
+        { id: 'clients', label: 'Client Roster', icon: Users, color: 'var(--hl-teal)' },
+        { id: 'consultations', label: 'Live Consultations', icon: Video, color: 'var(--hl-peach)' },
+      ],
     },
     {
-      title: 'AI TOOLS',
+      title: 'COMMUNICATION & AI',
       items: [
-        { id: 'plan-builder', label: 'AI Plan Builder', icon: FileText },
-        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap }
-      ]
-    }
-  ];
-
-  // Admin Groups
-  const adminGroups: NavGroup[] = [
-    {
-      title: 'PLATFORM OPERATIONS',
-      items: [
-        { id: 'admin-dashboard', label: 'Command Center', icon: ShieldCheck },
-        { id: 'user-management', label: 'Users & Permissions', icon: Users },
-        { id: 'ai-logs', label: 'AI Telemetry Logs', icon: Zap },
-        { id: 'content-moderation', label: 'Content Moderation', icon: Sliders }
-      ]
+        { id: 'chat', label: 'Client Messaging', icon: MessageSquare, color: 'var(--hl-green)' },
+        { id: 'plan-builder', label: 'AI Plan Builder', icon: FileText, color: 'var(--hl-amber)' },
+        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)' },
+      ],
     },
-    {
-      title: 'INTELLIGENCE',
-      items: [
-        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap }
-      ]
-    }
   ];
 
-  const activeGroups = user.role === 'admin' 
-    ? adminGroups 
-    : user.role === 'coach' 
-    ? coachGroups 
-    : memberGroups;
+  const activeGroups = user.role === 'coach' ? coachGroups : memberGroups;
 
-  const roles: { role: UserRole; name: string; label: string }[] = [
-    { role: 'member', name: 'Sarah Jenkins', label: 'Member' },
-    { role: 'coach', name: 'Alex Rivera, CSCS', label: 'Head Coach' },
-    { role: 'admin', name: 'Admin Operations', label: 'System Admin' }
-  ];
+  const handleNav = (tab: NavigationTab) => {
+    onSelectTab(tab);
+    onCloseMobile();
+  };
 
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpenMobile && (
-        <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        <div
+          className="fixed inset-0 backdrop-blur-sm z-40 lg:hidden"
+          style={{ background: 'rgba(44,36,32,0.35)' }}
           onClick={onCloseMobile}
         />
       )}
 
-      {/* Sidebar Container */}
-      <aside className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-[#ffffff] dark:bg-[#16221f] border-r border-[#e1e3e2] dark:border-[#263833] flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-        isOpenMobile ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
-      }`}>
-        
-        {/* Top Header & Brand */}
-        <div className="p-4 border-b border-[#e1e3e2] dark:border-[#263833] flex items-center justify-between">
-          <button 
-            onClick={() => { onSelectTab('home'); onCloseMobile(); }}
+      {/* Sidebar Panel */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-50 w-64 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+          isOpenMobile ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
+        }`}
+        style={{
+          background: 'var(--hl-surface)',
+          borderRight: '1px solid var(--hl-border)',
+        }}
+      >
+        {/* Brand Header */}
+        <div
+          className="p-4 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid var(--hl-border-light)' }}
+        >
+          <button
+            onClick={() => handleNav('home')}
             className="flex items-center gap-2.5 group focus:outline-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-[#0f5238] flex items-center justify-center text-white font-black shadow-md shadow-[#0f5238]/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 text-[#a8e7c5]" />
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform"
+              style={{ background: 'var(--hl-gradient-hero)' }}
+            >
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
             <div className="text-left">
-              <span className="text-lg font-extrabold tracking-tight text-[#191c1c] dark:text-[#eff1f0]">
-                Healthy<span className="text-[#0f5238] dark:text-[#95d4b3]">Life</span>
+              <span
+                className="text-lg font-extrabold tracking-tight"
+                style={{ color: 'var(--hl-text-primary)', fontFamily: "'DM Sans', sans-serif" }}
+              >
+                Healthy<span style={{ color: 'var(--hl-green)' }}>Life</span>
               </span>
-              <span className="block text-[9px] uppercase font-bold text-[#2d6a4f] dark:text-[#95d4b3] tracking-widest">
-                ORGANIC TECH AI
+              <span
+                className="block text-[9px] uppercase font-bold tracking-widest"
+                style={{ color: 'var(--hl-text-tertiary)' }}
+              >
+                WELLNESS PLATFORM
               </span>
             </div>
           </button>
-
-          {/* Close button for mobile */}
-          <button 
+          <button
             onClick={onCloseMobile}
-            className="lg:hidden p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-lg"
+            className="lg:hidden p-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--hl-text-tertiary)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface-alt)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* User Profile & Role Switcher Banner */}
-        <div className="p-3.5 mx-3 mt-3 rounded-2xl bg-[#f2f4f3] dark:bg-[#1c2e2a] border border-[#e1e3e2] dark:border-[#2a403a] relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <img 
-                src={user.avatar} 
-                alt={user.name} 
-                className="w-8 h-8 rounded-full object-cover border border-[#0f5238]"
-              />
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-[#191c1c] dark:text-[#eff1f0] truncate">{user.name}</p>
-                <span className="inline-block text-[10px] font-extrabold uppercase px-2 py-0.2 rounded-full bg-[#cce6d0] text-[#0f5238] dark:bg-[#2d6a4f] dark:text-[#a8e7c5]">
-                  {user.role}
-                </span>
-              </div>
+        {/* User Badge */}
+        <div className="px-3 pt-3 shrink-0">
+          <div
+            className="p-3 rounded-2xl flex items-center gap-2.5"
+            style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}
+          >
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="w-8 h-8 rounded-full object-cover"
+              style={{ border: '2px solid var(--hl-green)' }}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold truncate" style={{ color: 'var(--hl-text-primary)' }}>{user.name}</p>
+              <span className="hl-badge hl-badge-green">{user.role}</span>
             </div>
-
             <button
-              onClick={() => setShowRoleSelector(!showRoleSelector)}
-              className="p-1 rounded-lg hover:bg-[#e6e9e8] dark:hover:bg-[#283e38] text-slate-600 dark:text-slate-300 transition-colors"
-              title="Switch Role"
+              onClick={() => handleNav('home')}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: 'var(--hl-text-tertiary)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-border)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              title="View profile"
             >
-              <ChevronDown className="w-4 h-4" />
+              <User className="w-3.5 h-3.5" />
             </button>
           </div>
-
-          {/* Role Switcher Dropdown */}
-          {showRoleSelector && (
-            <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#16221f] rounded-2xl border border-[#e1e3e2] dark:border-[#263833] shadow-xl p-2 z-20 space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 px-2.5 py-1 uppercase tracking-wider">Switch Persona Role</p>
-              {roles.map((r) => (
-                <button
-                  key={r.role}
-                  onClick={() => {
-                    onSelectRole(r.role);
-                    setShowRoleSelector(false);
-                    onCloseMobile();
-                  }}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                    user.role === r.role 
-                      ? 'bg-[#0f5238] text-white' 
-                      : 'text-slate-700 dark:text-slate-200 hover:bg-[#f2f4f3] dark:hover:bg-[#20332d]'
-                  }`}
-                >
-                  <div className="text-left">
-                    <p className="font-bold">{r.label}</p>
-                    <p className="text-[10px] opacity-80">{r.name}</p>
-                  </div>
-                  {user.role === r.role && <CheckCircle2 className="w-4 h-4 text-[#a8e7c5]" />}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
-        {/* Quick Log Action Button */}
+        {/* Quick Log (member only) */}
         {user.role === 'member' && (
-          <div className="px-3 mt-3">
+          <div className="px-3 pt-3 shrink-0">
             <button
-              onClick={() => {
-                onOpenQuickLog();
-                onCloseMobile();
+              onClick={() => { onOpenQuickLog(); onCloseMobile(); }}
+              className="w-full py-2.5 px-3 rounded-2xl text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+              style={{
+                background: 'var(--hl-gradient-hero)',
+                boxShadow: '0 2px 10px rgba(61,122,90,0.25)',
               }}
-              className="w-full py-2.5 px-3 rounded-2xl bg-[#0f5238] hover:bg-[#0c432d] text-white font-extrabold text-xs shadow-md shadow-[#0f5238]/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
             >
               <Plus className="w-4 h-4" />
-              <span>Quick Log Meal / Water</span>
+              Quick Log Meal / Water
             </button>
           </div>
         )}
 
-        {/* Navigation Groups */}
+        {/* Nav Groups */}
         <div className="flex-1 overflow-y-auto py-4 px-3 space-y-5">
           {activeGroups.map((group, idx) => (
             <div key={idx} className="space-y-1">
-              <p className="px-3 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                {group.title}
-              </p>
+              <p className="hl-section-label px-3 mb-2">{group.title}</p>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentTab === item.id;
                 return (
                   <button
                     key={item.id}
-                    onClick={() => {
-                      onSelectTab(item.id);
-                      onCloseMobile();
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                    onClick={() => handleNav(item.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group`}
+                    style={
                       isActive
-                        ? 'bg-[#0f5238] text-white shadow-md shadow-[#0f5238]/20'
-                        : 'text-[#404943] dark:text-slate-300 hover:text-[#191c1c] dark:hover:text-white hover:bg-[#f2f4f3] dark:hover:bg-[#1f312c]'
-                    }`}
+                        ? {
+                            background: 'var(--hl-green-light)',
+                            color: 'var(--hl-green)',
+                            border: '1px solid var(--hl-green-border)',
+                            fontWeight: 700,
+                          }
+                        : { color: 'var(--hl-text-secondary)' }
+                    }
+                    onMouseEnter={e => {
+                      if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface-alt)';
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    }}
                   >
                     <div className="flex items-center gap-2.5">
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-[#a8e7c5]' : 'text-slate-500 dark:text-slate-400'}`} />
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
+                        style={
+                          isActive
+                            ? { background: 'var(--hl-green)', }
+                            : { background: 'var(--hl-surface-alt)' }
+                        }
+                      >
+                        <Icon
+                          className="w-3.5 h-3.5"
+                          style={{ color: isActive ? '#fff' : (item.color ?? 'var(--hl-text-tertiary)') }}
+                        />
+                      </div>
                       <span>{item.label}</span>
                     </div>
                     {item.badge && (
-                      <span className={`text-[10px] px-2 py-0.2 rounded-full font-extrabold ${
-                        isActive ? 'bg-white/20 text-white' : 'bg-[#cce6d0] text-[#0f5238] dark:bg-[#2d6a4f] dark:text-[#a8e7c5]'
-                      }`}>
+                      <span
+                        className="hl-badge"
+                        style={
+                          isActive
+                            ? { background: 'var(--hl-green)', color: '#fff' }
+                            : { background: 'var(--hl-lavender-light)', color: 'var(--hl-lavender)', border: '1px solid var(--hl-lavender-border)' }
+                        }
+                      >
                         {item.badge}
                       </span>
                     )}
@@ -289,13 +279,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
 
           {/* Public Home Link */}
-          <div className="pt-2 border-t border-[#e1e3e2] dark:border-[#263833]">
+          <div className="pt-2" style={{ borderTop: '1px solid var(--hl-border-light)' }}>
             <button
-              onClick={() => {
-                onSelectTab('home');
-                onCloseMobile();
-              }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+              onClick={() => handleNav('home')}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors"
+              style={{ color: 'var(--hl-text-tertiary)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--hl-text-primary)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--hl-text-tertiary)'; }}
             >
               <Home className="w-4 h-4" />
               <span>Public Landing Page</span>
@@ -303,39 +293,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Bottom Actions Footer */}
-        <div className="p-3 border-t border-[#e1e3e2] dark:border-[#263833] space-y-2 bg-[#f8faf9] dark:bg-[#121c19]">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={onToggleTheme}
-              className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-white dark:bg-[#1f312c] border border-[#e1e3e2] dark:border-[#2d453f] text-xs font-bold text-[#191c1c] dark:text-[#eff1f0] hover:bg-[#f2f4f3] transition-colors"
-            >
-              {theme === 'light' ? (
-                <>
-                  <Moon className="w-3.5 h-3.5 text-slate-600" />
-                  <span>Dark Mode</span>
-                </>
-              ) : (
-                <>
-                  <Sun className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Light Mode</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                onLogout();
-                onCloseMobile();
-              }}
-              className="p-2 rounded-xl bg-white dark:bg-[#1f312c] border border-[#e1e3e2] dark:border-[#2d453f] text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Footer — Sign Out */}
+        <div
+          className="p-3 shrink-0"
+          style={{ borderTop: '1px solid var(--hl-border-light)', background: 'var(--hl-bg)' }}
+        >
+          <button
+            onClick={() => { onLogout(); onCloseMobile(); }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-colors text-rose-500"
+            style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fff0f0'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface)'; }}
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
+          </button>
         </div>
-
       </aside>
     </>
   );

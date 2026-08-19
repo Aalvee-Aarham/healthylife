@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserRole } from '../../types';
 import { askGroqAI } from '../../services/groqApi';
-import { Sparkles, Send, Bot, User, RefreshCw, Zap, ShieldAlert, Dumbbell, Utensils, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Send, User, RefreshCw, Zap } from 'lucide-react';
 
 interface AIAssistantViewProps {
   userRole?: UserRole;
@@ -23,7 +23,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
     {
       id: 'm_init',
       sender: 'ai',
-      text: `Hello ${userName}! I am **HealthyLife AI**, powered by ultra-fast Llama-3.3-70b. How can I assist your ${userRole} workflow today?`,
+      text: `Hello! I am **HealthyLife AI**, powered by ultra-fast Llama-3.3-70b. How can I assist you today?`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -92,40 +92,54 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12 animate-fade-slide-up">
       
       {/* Header Banner */}
-      <div className="bg-[#0f5238] text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+      <div 
+        className="rounded-3xl p-6 sm:p-8 relative overflow-hidden hl-card"
+        style={{
+          background: 'var(--hl-gradient-hero)',
+          boxShadow: '0 8px 32px rgba(61,122,90,0.25)',
+        }}
+      >
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at top right, rgba(255,255,255,0.15) 0%, transparent 70%)' }}
+        />
+        
         <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-[#a8e7c5] text-xs font-bold">
-              <Zap className="w-3.5 h-3.5 fill-[#a8e7c5]" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+                 style={{ background: 'rgba(255,255,255,0.25)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}>
+              <Zap className="w-3.5 h-3.5" style={{ fill: '#fff' }} />
               <span>Llama-3.3-70b Intelligence Active</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               HealthyLife AI Health Advisor
             </h1>
-            <p className="text-xs sm:text-sm text-[#a8e7c5] max-w-xl">
+            <p className="text-sm max-w-xl text-white/90">
               Real-time bio-nutritional intelligence, workout alignment, and {userRole} insights.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2.5 rounded-2xl text-right shrink-0">
-            <span className="text-[10px] uppercase tracking-wider block font-bold text-[#a8e7c5]">Current Context</span>
-            <span className="text-sm font-black capitalize">{userRole} Workspace</span>
+          <div className="px-4 py-2.5 rounded-2xl border backdrop-blur-md shadow-md text-right shrink-0"
+               style={{ background: 'rgba(255,255,255,0.25)', borderColor: 'rgba(255,255,255,0.4)' }}>
+            <span className="text-[10px] uppercase tracking-wider block font-bold text-white/90">Current Context</span>
+            <span className="text-sm font-black capitalize text-white">{userRole} Workspace</span>
           </div>
         </div>
       </div>
 
       {/* Suggested Query Chips */}
       <div className="space-y-2">
-        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Recommended Quick Prompts for {userRole.toUpperCase()}:</span>
+        <span className="hl-section-label">Recommended Quick Prompts for {userRole.toUpperCase()}:</span>
         <div className="flex flex-wrap gap-2">
           {roleSuggestions[userRole].map((chip, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(chip)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 hover:border-emerald-300 dark:hover:bg-slate-700 transition-all text-left shadow-sm"
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all text-left shadow-sm hl-card-hover"
+              style={{ background: 'var(--hl-surface)', color: 'var(--hl-text-secondary)', border: '1px solid var(--hl-border)' }}
             >
               {chip}
             </button>
@@ -134,7 +148,7 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
       </div>
 
       {/* Chat Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-sm min-h-[420px] max-h-[550px] flex flex-col justify-between space-y-4">
+      <div className="rounded-3xl p-4 sm:p-6 shadow-sm min-h-[420px] max-h-[550px] flex flex-col justify-between space-y-4" style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)' }}>
         
         {/* Messages List */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 no-scrollbar">
@@ -146,17 +160,19 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                 className={`flex gap-3 ${isAI ? 'justify-start' : 'justify-end'}`}
               >
                 {isAI && (
-                  <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-md mt-1">
+                  <div className="w-8 h-8 rounded-full text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-md mt-1"
+                       style={{ background: 'var(--hl-green)' }}>
                     <Sparkles className="w-4 h-4" />
                   </div>
                 )}
 
                 <div
-                  className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed space-y-1 ${
+                  className={`max-w-[85%] p-4 rounded-2xl text-xs leading-relaxed space-y-1 shadow-sm`}
+                  style={
                     isAI
-                      ? 'bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700/60'
-                      : 'bg-emerald-600 text-white font-medium ml-auto shadow-md'
-                  }`}
+                      ? { background: 'var(--hl-surface-alt)', color: 'var(--hl-text-primary)', border: '1px solid var(--hl-border-light)' }
+                      : { background: 'var(--hl-green)', color: '#fff' }
+                  }
                 >
                   <div className="flex items-center justify-between text-[10px] font-bold opacity-75 mb-1 gap-4">
                     <span>{isAI ? 'HealthyLife AI' : userName}</span>
@@ -166,7 +182,8 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
                 </div>
 
                 {!isAI && (
-                  <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center shrink-0 font-bold text-xs mt-1">
+                  <div className="w-8 h-8 rounded-full text-white flex items-center justify-center shrink-0 font-bold text-xs mt-1"
+                       style={{ background: 'var(--hl-peach)' }}>
                     <User className="w-4 h-4" />
                   </div>
                 )}
@@ -175,8 +192,9 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
           })}
 
           {isLoading && (
-            <div className="flex items-center gap-3 text-xs text-slate-400 animate-pulse">
-              <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold">
+            <div className="flex items-center gap-3 text-xs animate-pulse" style={{ color: 'var(--hl-text-tertiary)' }}>
+              <div className="w-8 h-8 rounded-full text-white flex items-center justify-center font-bold"
+                   style={{ background: 'var(--hl-green)' }}>
                 <RefreshCw className="w-4 h-4 animate-spin" />
               </div>
               <span>HealthyLife AI is generating personalized response...</span>
@@ -190,19 +208,21 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
             e.preventDefault();
             handleSend();
           }}
-          className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800"
+          className="flex items-center gap-2 pt-3"
+          style={{ borderTop: '1px solid var(--hl-border-light)' }}
         >
           <input
             type="text"
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             placeholder={`Ask AI for ${userRole} guidance...`}
-            className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+            className="flex-1 px-4 py-3 rounded-2xl text-xs focus:ring-2 transition-all"
+            style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
           />
           <button
             type="submit"
             disabled={isLoading || !inputQuery.trim()}
-            className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all"
+            className="hl-btn-primary flex items-center gap-2 px-5 py-3 rounded-2xl disabled:opacity-50"
           >
             <span>Send</span>
             <Send className="w-3.5 h-3.5" />

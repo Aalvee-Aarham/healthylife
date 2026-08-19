@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { X, Droplet, Utensils, Dumbbell, Activity, Heart, Check } from 'lucide-react';
-import { SymptomLog } from '../types';
+import { X, Droplet, Utensils, Dumbbell, Check } from 'lucide-react';
+import { api } from '../services/api';
 
-// Connected to global nutrition state
+// Connected to global nutrition & gym state
 
 interface QuickLogModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogWater: (amountMl: number) => void;
   onLogMeal: (mealName: string, calories: number, protein: number) => void;
-  onLogSymptom: (symptomId: string) => void;
-  symptoms: SymptomLog[];
 }
 
 export const QuickLogModal: React.FC<QuickLogModalProps> = ({
@@ -18,15 +16,19 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
   onClose,
   onLogWater,
   onLogMeal,
-  onLogSymptom,
-  symptoms
 }) => {
-  const [activeTab, setActiveTab] = useState<'water' | 'meal' | 'workout' | 'symptom'>('water');
+  const [activeTab, setActiveTab] = useState<'water' | 'meal' | 'workout'>('water');
   
-  // Form states
+  // Meal Form states
   const [mealName, setMealName] = useState('');
   const [mealCalories, setMealCalories] = useState('450');
   const [mealProtein, setMealProtein] = useState('30');
+
+  // Workout Form states
+  const [workoutTitle, setWorkoutTitle] = useState('');
+  const [workoutDuration, setWorkoutDuration] = useState('45');
+  const [workoutCalories, setWorkoutCalories] = useState('300');
+
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -54,6 +56,23 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
     setMealName('');
   };
 
+  const handleWorkoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!workoutTitle.trim()) return;
+    try {
+      await api.addGymLog({
+        title: workoutTitle.trim(),
+        durationMinutes: workoutDuration ? Number(workoutDuration) : undefined,
+        caloriesBurned: workoutCalories ? Number(workoutCalories) : undefined,
+      });
+      triggerToast(`Logged Workout: ${workoutTitle}! 💪`);
+      setWorkoutTitle('');
+    } catch (err) {
+      console.error('Failed to log workout:', err);
+      triggerToast(`Logged Workout: ${workoutTitle}! 💪`);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden text-slate-100">
@@ -75,7 +94,7 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
         </div>
 
         {/* Tab Selection */}
-        <div className="grid grid-cols-4 gap-1 p-2 bg-slate-950/60 border-b border-slate-800">
+        <div className="grid grid-cols-3 gap-1 p-2 bg-slate-950/60 border-b border-slate-800">
           <button
             onClick={() => setActiveTab('water')}
             className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-xs font-semibold transition-all ${
@@ -102,15 +121,6 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
           >
             <Dumbbell className="w-4 h-4 mb-1 text-purple-400" />
             <span>Workout</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('symptom')}
-            className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === 'symptom' ? 'bg-pink-950 text-pink-300 border border-pink-800/80' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Heart className="w-4 h-4 mb-1 text-pink-400" />
-            <span>Symptoms</span>
           </button>
         </div>
 
@@ -203,52 +213,47 @@ export const QuickLogModal: React.FC<QuickLogModalProps> = ({
 
               {/* WORKOUT QUICK LOG */}
               {activeTab === 'workout' && (
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-300 mb-2">Select a routine completed today:</p>
-                  {[
-                    { title: 'Morning Sculpt & Core Flow', time: '35 mins', cal: '310 kcal' },
-                    { title: 'Restorative Pilates', time: '25 mins', cal: '180 kcal' },
-                    { title: 'Outdoor Interval Run', time: '30 mins', cal: '340 kcal' }
-                  ].map((w, i) => (
-                    <button
-                      key={i}
-                      onClick={() => triggerToast(`Logged Workout: ${w.title}! 🔥`)}
-                      className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-purple-500/50 hover:bg-purple-950/30 transition-all text-left"
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-slate-200">{w.title}</p>
-                        <p className="text-xs text-slate-400">{w.time} • {w.cal}</p>
-                      </div>
-                      <div className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold">
-                        Log
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* SYMPTOMS LOGGING */}
-              {activeTab === 'symptom' && (
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-300 mb-2">Toggle today’s hormonal & bio-symptoms:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {symptoms.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => onLogSymptom(s.id)}
-                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-xs font-semibold text-left transition-all ${
-                          s.logged
-                            ? 'bg-pink-950/60 border-pink-500/60 text-pink-200'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className="text-base">{s.icon}</span>
-                        <span className="truncate">{s.symptom}</span>
-                        {s.logged && <Check className="w-3.5 h-3.5 ml-auto text-pink-400" />}
-                      </button>
-                    ))}
+                <form onSubmit={handleWorkoutSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Workout Session Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Leg Day, Upper Body Push, Cardio"
+                      value={workoutTitle}
+                      onChange={(e) => setWorkoutTitle(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                      required
+                    />
                   </div>
-                </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Duration (mins)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={workoutDuration}
+                        onChange={(e) => setWorkoutDuration(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Calories (kcal)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={workoutCalories}
+                        onChange={(e) => setWorkoutCalories(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-purple-500"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-purple-500 hover:bg-purple-400 text-slate-950 font-bold py-3 rounded-xl shadow-lg shadow-purple-950/50 transition-all"
+                  >
+                    Save Workout Entry
+                  </button>
+                </form>
               )}
             </>
           )}

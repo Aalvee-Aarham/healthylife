@@ -79,6 +79,33 @@ class AuthController extends Controller
 
         $token = $user->createToken('api')->plainTextToken;
 
+        // Automatically assign and start default chat conversations with Trainer and Nutritionist coaches
+        $trainer = User::where('coach_specialty', 'trainer')->first();
+        if ($trainer) {
+            $convTrainer = \App\Models\Conversation::firstOrCreate([
+                'member_id' => $user->id,
+                'coach_id' => $trainer->id,
+            ]);
+            \App\Models\ChatMessage::create([
+                'conversation_id' => $convTrainer->id,
+                'sender_id' => $trainer->id,
+                'body' => "Hi {$user->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
+            ]);
+        }
+
+        $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
+        if ($nutritionist && (!$trainer || $nutritionist->id !== $trainer->id)) {
+            $convNutri = \App\Models\Conversation::firstOrCreate([
+                'member_id' => $user->id,
+                'coach_id' => $nutritionist->id,
+            ]);
+            \App\Models\ChatMessage::create([
+                'conversation_id' => $convNutri->id,
+                'sender_id' => $nutritionist->id,
+                'body' => "Welcome {$user->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
+            ]);
+        }
+
         return response()->json([
             'user' => $this->formatUser($user),
             'token' => $token,

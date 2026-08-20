@@ -161,8 +161,8 @@ export const api = {
   getCycleSymptoms: (from: string, to: string) =>
     get<any>(`/cycle/symptoms?from=${from}&to=${to}`),
 
-  toggleCycleSymptom: (key: string, date: string) =>
-    post<any>('/cycle/symptoms/toggle', { key, date }),
+  toggleCycleSymptom: (symptom_key: string, date: string) =>
+    post<any>('/cycle/symptoms/toggle', { symptom_key, date }),
 
   // ── Chat ────────────────────────────────────────────────────────────────────
 

@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { GymLog } from '../../types';
+import { api } from '../../services/api';
 
 interface ExerciseFormItem {
   name: string;

@@ -52,8 +52,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/cycle/status',                [CycleController::class, 'status']);
     Route::get('/cycle/periods',               [CycleController::class, 'periods']);
     Route::post('/cycle/periods',              [CycleController::class, 'logPeriod']);
-    Route::patch('/cycle/periods/{cyclePeriod}', [CycleController::class, 'updatePeriod']);
-    Route::delete('/cycle/periods/{cyclePeriod}', [CycleController::class, 'deletePeriod']);
+    Route::patch('/cycle/periods/{period}',    [CycleController::class, 'updatePeriod']);
+    Route::delete('/cycle/periods/{period}',   [CycleController::class, 'deletePeriod']);
     Route::get('/cycle/symptoms',              [CycleController::class, 'symptoms']);
     Route::post('/cycle/symptoms/toggle',      [CycleController::class, 'toggleSymptom']);
 

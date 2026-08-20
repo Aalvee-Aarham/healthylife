@@ -15,6 +15,8 @@ class ChatController extends Controller
         $user = $request->user();
 
         if ($user->isMember()) {
+            $this->ensureDefaultCoachConversations($user);
+
             $conversations = Conversation::where('member_id', $user->id)
                 ->with(['coach', 'messages' => fn ($q) => $q->latest()->limit(1)])
                 ->get();
@@ -33,6 +35,46 @@ class ChatController extends Controller
                 ? $this->formatMessage($c->messages->first(), $user)
                 : null,
         ]));
+    }
+
+    private function ensureDefaultCoachConversations(User $member): void
+    {
+        // 1. Trainer Coach
+        $trainer = User::where('coach_specialty', 'trainer')->first();
+        if (!$trainer) {
+            $trainer = User::where('role', 'coach')->first();
+        }
+        if ($trainer) {
+            $convTrainer = Conversation::firstOrCreate([
+                'member_id' => $member->id,
+                'coach_id' => $trainer->id,
+            ]);
+
+            if ($convTrainer->messages()->count() === 0) {
+                ChatMessage::create([
+                    'conversation_id' => $convTrainer->id,
+                    'sender_id' => $trainer->id,
+                    'body' => "Hi {$member->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
+                ]);
+            }
+        }
+
+        // 2. Nutritionist Coach
+        $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
+        if ($nutritionist && (!$trainer || $nutritionist->id !== $trainer->id)) {
+            $convNutri = Conversation::firstOrCreate([
+                'member_id' => $member->id,
+                'coach_id' => $nutritionist->id,
+            ]);
+
+            if ($convNutri->messages()->count() === 0) {
+                ChatMessage::create([
+                    'conversation_id' => $convNutri->id,
+                    'sender_id' => $nutritionist->id,
+                    'body' => "Welcome {$member->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
+                ]);
+            }
+        }
     }
 
     public function messages(Request $request, Conversation $conversation)
@@ -95,16 +137,23 @@ class ChatController extends Controller
         $user = $request->user();
 
         if ($user->isCoach()) {
+            // Get members from coach_assignments or from conversations
+            $memberIds = $user->members()->pluck('users.id')
+                ->merge(Conversation::where('coach_id', $user->id)->pluck('member_id'))
+                ->unique();
+
+            $members = User::whereIn('id', $memberIds)->get();
+
             return response()->json(
-                $user->members()->get()->map(fn (User $m) => $this->formatClient($m))
+                $members->map(fn (User $m) => $this->formatClient($m, $user))
             );
         }
 
         return response()->json(
             $user->coaches()->get()->map(fn (User $c) => [
                 ...$this->formatPartner($c),
-                'specialty' => $c->pivot->specialty,
-                'notes' => $c->pivot->notes,
+                'specialty' => $c->pivot->specialty ?? $c->coach_specialty,
+                'notes' => $c->pivot->notes ?? '',
             ])
         );
     }
@@ -129,14 +178,15 @@ class ChatController extends Controller
         ];
     }
 
-    private function formatClient(User $user): array
+    private function formatClient(User $user, ?User $coach = null): array
     {
+        $specialty = $user->pivot->specialty ?? $coach?->coach_specialty ?? 'trainer';
         return [
             'id' => (string) $user->id,
             'name' => $user->name,
             'avatar' => $user->avatar,
             'email' => $user->email,
-            'planName' => $user->pivot->specialty === 'nutritionist' ? 'Nutrition Plan' : 'Training Plan',
+            'planName' => $specialty === 'nutritionist' ? 'Nutrition Plan' : 'Training Plan',
             'status' => 'On Track',
             'adherencePercent' => 85,
             'lastActive' => 'Today',

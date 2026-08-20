@@ -10,9 +10,40 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Seed default demo users if not present
-        if (!User::where('email', 'member@healthylife.com')->exists()) {
-            User::create([
+        // 1. Seed Trainer Coach
+        $trainer = User::where('coach_specialty', 'trainer')->first();
+        if (!$trainer) {
+            $trainer = User::create([
+                'name' => 'Alex Rivera, CSCS',
+                'email' => 'coach@healthylife.com',
+                'password' => Hash::make('password123'),
+                'role' => 'coach',
+                'gender' => 'male',
+                'avatar' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
+                'coach_specialty' => 'trainer',
+                'title' => 'Master Strength Coach & Biometrics Specialist',
+            ]);
+        }
+
+        // 2. Seed Nutritionist Coach
+        $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
+        if (!$nutritionist) {
+            $nutritionist = User::create([
+                'name' => 'Dr. Elena Chen',
+                'email' => 'nutritionist@healthylife.com',
+                'password' => Hash::make('password123'),
+                'role' => 'coach',
+                'gender' => 'female',
+                'avatar' => 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
+                'coach_specialty' => 'nutritionist',
+                'title' => 'Clinical Nutritionist & Metabolic Specialist',
+            ]);
+        }
+
+        // 3. Seed default demo member
+        $member = User::where('email', 'member@healthylife.com')->first();
+        if (!$member) {
+            $member = User::create([
                 'name' => 'Maya Lin',
                 'email' => 'member@healthylife.com',
                 'password' => Hash::make('password123'),
@@ -33,19 +64,7 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-        if (!User::where('email', 'coach@healthylife.com')->exists()) {
-            User::create([
-                'name' => 'Alex Vance',
-                'email' => 'coach@healthylife.com',
-                'password' => Hash::make('password123'),
-                'role' => 'coach',
-                'gender' => 'male',
-                'avatar' => 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
-                'coach_specialty' => 'trainer',
-                'title' => 'Master Strength Coach & Biometrics Specialist',
-            ]);
-        }
-
+        // 4. Seed Admin
         if (!User::where('email', 'admin@healthylife.com')->exists()) {
             User::create([
                 'name' => 'Admin Superuser',
@@ -53,8 +72,42 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'role' => 'admin',
                 'gender' => 'female',
-                'avatar' => 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
+                'avatar' => 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400',
             ]);
+        }
+
+        // 5. Ensure all members have default coach conversations
+        $members = User::where('role', 'member')->get();
+        foreach ($members as $m) {
+            if ($trainer) {
+                $convTrainer = \App\Models\Conversation::firstOrCreate([
+                    'member_id' => $m->id,
+                    'coach_id' => $trainer->id,
+                ]);
+
+                if ($convTrainer->messages()->count() === 0) {
+                    \App\Models\ChatMessage::create([
+                        'conversation_id' => $convTrainer->id,
+                        'sender_id' => $trainer->id,
+                        'body' => "Hi {$m->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
+                    ]);
+                }
+            }
+
+            if ($nutritionist) {
+                $convNutri = \App\Models\Conversation::firstOrCreate([
+                    'member_id' => $m->id,
+                    'coach_id' => $nutritionist->id,
+                ]);
+
+                if ($convNutri->messages()->count() === 0) {
+                    \App\Models\ChatMessage::create([
+                        'conversation_id' => $convNutri->id,
+                        'sender_id' => $nutritionist->id,
+                        'body' => "Welcome {$m->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
+                    ]);
+                }
+            }
         }
     }
 }

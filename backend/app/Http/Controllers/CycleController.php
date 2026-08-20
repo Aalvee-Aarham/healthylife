@@ -150,7 +150,7 @@ class CycleController extends Controller
     // ─── PATCH /cycle/periods/{period} ────────────────────────────────────────
     public function updatePeriod(Request $request, CyclePeriod $period): JsonResponse
     {
-        if ($period->user_id !== $request->user()->id) {
+        if ((int) $period->user_id !== (int) $request->user()->id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -178,7 +178,7 @@ class CycleController extends Controller
     // ─── DELETE /cycle/periods/{period} ─────────────────────────────────────
     public function deletePeriod(Request $request, CyclePeriod $period): JsonResponse
     {
-        if ($period->user_id !== $request->user()->id) {
+        if ((int) $period->user_id !== (int) $request->user()->id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 

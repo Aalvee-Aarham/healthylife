@@ -17,10 +17,9 @@ export const CoachDashboardView: React.FC<CoachDashboardViewProps> = ({ user }) 
   const [search, setSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null);
   const [chatMsg, setChatMsg] = useState('');
-  const [messages, setMessages] = useState<{ sender: string; text: string; time: string }[]>([
-    { sender: 'client', text: 'Hi Coach! Completed today\'s RDL set at 75kg.', time: '10:15 AM' },
-    { sender: 'coach', text: 'Awesome work! Your hip hinge form looked clean.', time: '10:18 AM' },
-  ]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [currentConvId, setCurrentConvId] = useState<string | null>(null);
 
   useEffect(() => {
     api.getClients()
@@ -30,18 +29,54 @@ export const CoachDashboardView: React.FC<CoachDashboardViewProps> = ({ user }) 
       })
       .catch((e) => setError(e?.message || 'Failed to load clients.'))
       .finally(() => setIsLoading(false));
+
+    api.getConversations()
+      .then(setConversations)
+      .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!selectedClient) return;
+    const conv = conversations.find(c => c.partner?.id === selectedClient.id);
+    if (conv) {
+      setCurrentConvId(conv.id);
+      api.getMessages(conv.id).then(setMessages).catch(console.error);
+    } else {
+      setCurrentConvId(null);
+      setMessages([]);
+    }
+  }, [selectedClient, conversations]);
 
   const filtered = clients.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.planName.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatMsg.trim()) return;
-    setMessages((prev) => [...prev, { sender: 'coach', text: chatMsg, time: 'Just now' }]);
+    if (!chatMsg.trim() || !selectedClient) return;
+    const text = chatMsg.trim();
     setChatMsg('');
+
+    try {
+      let convId = currentConvId;
+      if (!convId) {
+        const convs = await api.getConversations();
+        setConversations(convs);
+        const found = convs.find(c => c.partner?.id === selectedClient.id);
+        if (found) {
+          convId = found.id;
+          setCurrentConvId(convId);
+        }
+      }
+
+      if (convId) {
+        const sent = await api.sendMessage(convId, text);
+        setMessages(prev => [...prev, sent]);
+      }
+    } catch (err: any) {
+      console.error('Failed to send message:', err);
+    }
   };
 
   const stats = [
@@ -198,14 +233,18 @@ export const CoachDashboardView: React.FC<CoachDashboardViewProps> = ({ user }) 
                 </h3>
 
                 <div className="max-h-52 overflow-y-auto p-4 bg-slate-800/80 rounded-2xl border border-slate-700 space-y-3">
-                  {messages.map((m, i) => (
-                    <div key={i} className={`flex flex-col ${m.sender === 'coach' ? 'items-end' : 'items-start'}`}>
-                      <div className={`p-3 rounded-2xl text-xs max-w-xs ${
-                        m.sender === 'coach' ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-200 border border-slate-600'
-                      }`}>{m.text}</div>
-                      <span className="text-[9px] text-slate-500 mt-0.5">{m.time}</span>
-                    </div>
-                  ))}
+                  {messages.map((m, i) => {
+                    const isMine = m.isMine ?? (m.sender === 'coach');
+                    const text = m.body ?? m.text;
+                    return (
+                      <div key={m.id || i} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                        <div className={`p-3 rounded-2xl text-xs max-w-xs ${
+                          isMine ? 'bg-teal-600 text-white' : 'bg-slate-700 text-slate-200 border border-slate-600'
+                        }`}>{text}</div>
+                        <span className="text-[9px] text-slate-500 mt-0.5">{m.time}</span>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <form onSubmit={handleSend} className="flex gap-2">

@@ -35,6 +35,8 @@ interface NavItem {
   icon: React.ElementType;
   badge?: string;
   color?: string;
+  bgLight?: string;
+  borderLight?: string;
 }
 
 interface NavGroup {
@@ -55,16 +57,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'CORE WELLNESS',
       items: [
-        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, color: 'var(--hl-green)' },
-        { id: 'nutrition', label: 'Nutrition & Macros', icon: UtensilsCrossed, color: 'var(--hl-teal)' },
-        { id: 'workouts', label: 'Gym & Workouts', icon: Dumbbell, color: 'var(--hl-peach)' },
+        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
+        { id: 'nutrition', label: 'Nutrition & Macros', icon: UtensilsCrossed, color: 'var(--hl-teal)', bgLight: 'var(--hl-teal-light)', borderLight: 'var(--hl-teal-border)' },
+        { id: 'workouts', label: 'Gym & Workouts', icon: Dumbbell, color: 'var(--hl-peach)', bgLight: 'var(--hl-peach-light)', borderLight: 'var(--hl-peach-border)' },
       ],
     },
     {
       title: 'CONNECT',
       items: [
-        { id: 'chat', label: 'Chat with Coach', icon: MessageSquare, color: 'var(--hl-green)' },
-        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)' },
+        { id: 'chat', label: 'Chat with Coach', icon: MessageSquare, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
+        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)', bgLight: 'var(--hl-amber-light)', borderLight: 'var(--hl-amber-border)' },
         ...(user.gender !== 'male'
           ? [
               {
@@ -73,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 icon: Sparkles,
                 badge: user.cycleDay ? `Day ${user.cycleDay}` : undefined,
                 color: 'var(--hl-lavender)',
+                bgLight: 'var(--hl-lavender-light)',
+                borderLight: 'var(--hl-lavender-border)',
               },
             ]
           : []),
@@ -84,17 +88,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'COACHING MANAGEMENT',
       items: [
-        { id: 'coach-dashboard', label: 'Coach Portal', icon: Briefcase, color: 'var(--hl-green)' },
-        { id: 'clients', label: 'Client Roster', icon: Users, color: 'var(--hl-teal)' },
-        { id: 'consultations', label: 'Live Consultations', icon: Video, color: 'var(--hl-peach)' },
+        { id: 'coach-dashboard', label: 'Coach Portal', icon: Briefcase, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
+        { id: 'clients', label: 'Client Roster', icon: Users, color: 'var(--hl-teal)', bgLight: 'var(--hl-teal-light)', borderLight: 'var(--hl-teal-border)' },
+        { id: 'consultations', label: 'Live Consultations', icon: Video, color: 'var(--hl-peach)', bgLight: 'var(--hl-peach-light)', borderLight: 'var(--hl-peach-border)' },
       ],
     },
     {
       title: 'COMMUNICATION & AI',
       items: [
-        { id: 'chat', label: 'Client Messaging', icon: MessageSquare, color: 'var(--hl-green)' },
-        { id: 'plan-builder', label: 'AI Plan Builder', icon: FileText, color: 'var(--hl-amber)' },
-        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)' },
+        { id: 'chat', label: 'Client Messaging', icon: MessageSquare, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
+        { id: 'plan-builder', label: 'AI Plan Builder', icon: FileText, color: 'var(--hl-amber)', bgLight: 'var(--hl-amber-light)', borderLight: 'var(--hl-amber-border)' },
+        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)', bgLight: 'var(--hl-amber-light)', borderLight: 'var(--hl-amber-border)' },
       ],
     },
   ];
@@ -230,12 +234,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     style={
                       isActive
                         ? {
-                            background: 'var(--hl-green-light)',
-                            color: 'var(--hl-green)',
-                            border: '1px solid var(--hl-green-border)',
+                            background: item.bgLight || 'var(--hl-green-light)',
+                            color: item.color || 'var(--hl-green)',
+                            border: `1px solid ${item.borderLight || 'var(--hl-green-border)'}`,
                             fontWeight: 700,
                           }
-                        : { color: 'var(--hl-text-secondary)' }
+                        : { color: 'var(--hl-text-secondary)', border: '1px solid transparent' }
                     }
                     onMouseEnter={e => {
                       if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface-alt)';
@@ -249,7 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
                         style={
                           isActive
-                            ? { background: 'var(--hl-green)', }
+                            ? { background: item.color || 'var(--hl-green)', }
                             : { background: 'var(--hl-surface-alt)' }
                         }
                       >
@@ -300,10 +304,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <button
             onClick={() => { onLogout(); onCloseMobile(); }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-colors text-rose-500"
-            style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fff0f0'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface)'; }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-colors"
+            style={{ color: 'var(--hl-peach)', background: 'var(--hl-surface)', border: '1px solid var(--hl-border)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-peach-light)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--hl-peach-border)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--hl-border)'; }}
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />

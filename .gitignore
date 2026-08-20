@@ -8,3 +8,12 @@ coverage/
 !.env.example
 PROJECT_BREAKDOWN.md
 metadata.json
+backend/vendor/
+backend/storage/*.key
+backend/storage/logs/*.log
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*
+.vscode/
+

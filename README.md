@@ -70,6 +70,6 @@ App runs at `http://localhost:3000`
 | Role | Member | GitHub |
 |------|--------|--------|
 | Team Lead | Aalvee Aarham | [@Aalvee-Aarham](https://github.com/Aalvee-Aarham) |
-| Developer | Namira Mojumder | [@tsunaami](https://github.com/tsunaami) |
-| Developer | Rubaida Zakir | [@Joyaaa-91](https://github.com/Joyaaa-91) |
+| Developer | Farhana Mojumder Namira | [@tsunaami](https://github.com/tsunaami) |
+| Developer | Rubida Zakir Joya | [@Joyaaa-91](https://github.com/Joyaaa-91) |
 | Developer | Iftekhar | [@iftekhar141879](https://github.com/iftekhar141879) |

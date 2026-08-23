@@ -3,7 +3,7 @@
 $PHP = 'C:\Users\User\AppData\Local\Microsoft\WinGet\Packages\PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe\php.exe'
 $POSTGRES = 'C:\Program Files\PostgreSQL\17\bin\postgres.exe'
 $POSTGRES_DATA = 'C:\Program Files\PostgreSQL\17\data'
-$BACKEND_DIR = Join-Path $PSScriptRoot 'backend'
+$BACKEND_DIR = Join-Path $PSScriptRoot 'packages\backend'
 
 Write-Host ''
 Write-Host '  HealthyLife Dev Server' -ForegroundColor Cyan

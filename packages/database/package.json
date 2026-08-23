@@ -1,0 +1,10 @@
+{
+  "name": "@healthy-life/database",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "db:generate": "echo \"Add your database generation command here\"",
+    "db:migrate": "echo \"Add your migration command here\""
+  }
+}

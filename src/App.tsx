@@ -90,6 +90,9 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    import('./services/firebase').then(({ logOutFirebase }) => {
+      logOutFirebase().catch(console.error);
+    });
     setAuthToken(null);
     setUser(null);
     setIsLoggedIn(false);
@@ -228,6 +231,9 @@ export default function App() {
                     error={dashboard.error}
                     onSelectTab={setCurrentTab}
                     onLogWater={handleLogWater}
+                    onAddMeal={handleAddMeal}
+                    isOpenExternalQuickLog={isQuickLogOpen}
+                    onCloseExternalQuickLog={() => setIsQuickLogOpen(false)}
                   />
                 )}
                 {currentTab === 'nutrition' && (
@@ -287,7 +293,7 @@ export default function App() {
         </div>
 
         <QuickLogModal
-          isOpen={isQuickLogOpen}
+          isOpen={isQuickLogOpen && currentTab !== 'dashboard'}
           onClose={() => setIsQuickLogOpen(false)}
           onLogWater={handleLogWater}
           onLogMeal={handleAddMeal}

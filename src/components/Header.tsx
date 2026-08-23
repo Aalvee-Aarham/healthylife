@@ -1,11 +1,11 @@
 import React from 'react';
 import { NavigationTab, UserProfile } from '../types';
-import { Menu, Zap, Plus, Bell } from 'lucide-react';
+import { Menu, Zap, Bell } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: NavigationTab;
   user: UserProfile;
-  onOpenQuickLog: () => void;
+  onOpenQuickLog?: () => void;
   onOpenMobileSidebar: () => void;
   onSelectTab: (tab: NavigationTab) => void;
 }
@@ -118,29 +118,6 @@ export const Header: React.FC<HeaderProps> = ({
               style={{ background: 'var(--hl-peach)' }}
             />
           </button>
-
-          {/* Member Quick Log */}
-          {user.role === 'member' && (
-            <button
-              onClick={onOpenQuickLog}
-              className="px-3.5 py-2 rounded-full text-white font-extrabold text-xs flex items-center gap-1.5 transition-all"
-              style={{
-                background: 'var(--hl-green)',
-                boxShadow: '0 2px 8px rgba(61,122,90,0.25)',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = 'var(--hl-green-hover)';
-                (e.currentTarget as HTMLElement).style.transform = 'scale(1.02)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = 'var(--hl-green)';
-                (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Quick Log</span>
-            </button>
-          )}
 
           {/* User Avatar */}
           <div className="flex items-center gap-2 pl-2" style={{ borderLeft: '1px solid var(--hl-border-light)' }}>

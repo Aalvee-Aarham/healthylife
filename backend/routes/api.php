@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 // ── Public routes ─────────────────────────────────────────────────────────────
 Route::post('/auth/login',    [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/firebase', [AuthController::class, 'firebaseAuth']);
 
 // ── Protected routes (Sanctum token) ─────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {

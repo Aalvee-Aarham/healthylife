@@ -48,6 +48,35 @@ export const SignInView: React.FC<SignInViewProps> = ({ onLoginSuccess, onSelect
     }
   };
 
+  const handleFirebaseSocialLogin = async (profilePayload: Record<string, unknown>, role: 'member' | 'coach') => {
+    setIsLoading(true);
+    setError(null);
+    setServerDown(false);
+
+    try {
+      const { user, token } = await api.firebaseAuth({ ...profilePayload, role });
+      setAuthToken(token);
+
+      const targetTab: NavigationTab = user.role === 'coach' ? 'coach-dashboard' : 'dashboard';
+      onLoginSuccess(user, targetTab);
+    } catch (err: any) {
+      const msg: string = err?.message ?? 'Unknown error';
+      const isNetworkError =
+        msg.toLowerCase().includes('failed to fetch') ||
+        msg.toLowerCase().includes('network') ||
+        msg.toLowerCase().includes('err_connection');
+
+      if (isNetworkError) {
+        setServerDown(true);
+        setError('Cannot reach the HealthyLife server. Please check if the backend is running.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6 space-y-8">
 
@@ -162,9 +191,20 @@ export const SignInView: React.FC<SignInViewProps> = ({ onLoginSuccess, onSelect
           </div>
 
           {panel === 'member' ? (
-            <UserSignIn onSubmit={handleLogin} isLoading={isLoading} error={!serverDown ? error : null} onSelectTab={onSelectTab} />
+            <UserSignIn
+              onSubmit={handleLogin}
+              onSocialLoginSuccess={(profilePayload) => handleFirebaseSocialLogin(profilePayload, 'member')}
+              isLoading={isLoading}
+              error={!serverDown ? error : null}
+              onSelectTab={onSelectTab}
+            />
           ) : (
-            <CoachSignIn onSubmit={handleLogin} isLoading={isLoading} error={!serverDown ? error : null} />
+            <CoachSignIn
+              onSubmit={handleLogin}
+              onSocialLoginSuccess={(profilePayload) => handleFirebaseSocialLogin(profilePayload, 'coach')}
+              isLoading={isLoading}
+              error={!serverDown ? error : null}
+            />
           )}
         </div>
 

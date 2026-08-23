@@ -72,6 +72,9 @@ export const api = {
   register: (payload: Record<string, unknown>) =>
     post<{ user: any; token: string }>('/auth/register', payload),
 
+  firebaseAuth: (payload: Record<string, unknown>) =>
+    post<{ user: any; token: string }>('/auth/firebase', payload),
+
   me: () =>
     get<any>('/auth/me'),
 

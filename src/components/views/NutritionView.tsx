@@ -6,7 +6,7 @@ import { fetchPexelsImage } from '../../services/pexelsApi';
 import {
   Utensils, Sparkles, Plus, Pencil, Trash2, X, Check,
   ChevronDown, ChevronUp, Send, Loader2, AlertCircle,
-  Calendar, Clock, Camera, BookOpen, Flame, Zap, Droplet, Droplets,
+  Calendar, Clock, Camera, BookOpen, Flame, Zap, Droplet, Droplets, Bookmark,
 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -1047,12 +1047,24 @@ function EditPlanModal({ plan, defaultDay, onClose, onSaved }: EditPlanModalProp
   );
 }
 
-function MealPlanSection() {
+interface MealPlanSectionProps {
+  onAddMeal: (
+    name: string, cal: number, protein: number,
+    customCarbs?: number, customFat?: number, customImage?: string,
+    category?: MealCategory, aiTag?: string
+  ) => void;
+  selectedDate: string;
+}
+
+function MealPlanSection({ onAddMeal, selectedDate }: MealPlanSectionProps) {
   const today = new Date().getDay();
   const [selectedDay, setSelectedDay] = useState(today);
   const [plans, setPlans] = useState<MealPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingPlan, setEditingPlan] = useState<MealPlan | null | 'new'>(null);
+
+  const [loggedMealIds, setLoggedMealIds] = useState<Record<string, boolean>>({});
+  const [bannerNotice, setBannerNotice] = useState<string | null>(null);
 
   const fetchPlans = useCallback(async () => {
     setIsLoading(true);
@@ -1074,7 +1086,10 @@ function MealPlanSection() {
   const dayTotalCal = dayPlans.reduce((s, p) => s + p.calories, 0);
 
   const handleDelete = async (id: string) => {
-    try { await api.deleteMealPlan(id); setPlans(prev => prev.filter(p => p.id !== id)); } catch {}
+    try {
+      await api.deleteMealPlan(id);
+      setPlans(prev => prev.filter(p => p.id !== id));
+    } catch {}
   };
 
   const handleSave = async (data: any) => {
@@ -1089,28 +1104,69 @@ function MealPlanSection() {
     } catch {}
   };
 
+
+
+  const handleQuickLogToToday = (plan: MealPlan) => {
+    onAddMeal(
+      plan.name,
+      plan.calories,
+      plan.protein,
+      plan.carbs,
+      plan.fat,
+      plan.image,
+      plan.mealTime,
+      'From Weekly Plan'
+    );
+    setLoggedMealIds(prev => ({ ...prev, [plan.id]: true }));
+    setBannerNotice(`Logged "${plan.name}" to today's food diary! 🥗`);
+    setTimeout(() => {
+      setBannerNotice(null);
+      setLoggedMealIds(prev => ({ ...prev, [plan.id]: false }));
+    }, 3000);
+  };
+
+  const handleLogAllToday = () => {
+    if (dayPlans.length === 0) return;
+    dayPlans.forEach(plan => {
+      onAddMeal(
+        plan.name,
+        plan.calories,
+        plan.protein,
+        plan.carbs,
+        plan.fat,
+        plan.image,
+        plan.mealTime,
+        'From Weekly Plan'
+      );
+    });
+    setBannerNotice(`🎉 Logged all ${dayPlans.length} planned meals for ${DAYS[selectedDay]} to today's diary!`);
+    setTimeout(() => setBannerNotice(null), 4000);
+  };
+
   return (
     <div className="rounded-3xl hl-card overflow-hidden">
       {/* Header */}
       <div className="p-6" style={{ background: 'linear-gradient(135deg, #3D7A5A 0%, #4A9B8E 100%)' }}>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
               <BookOpen className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-lg font-extrabold text-white">Weekly Meal Plan</h2>
-              <p className="text-xs text-white/70">{dayTotalCal} kcal planned for {DAYS[selectedDay]}</p>
+              <p className="text-xs text-white/80">{dayTotalCal} kcal planned for {DAYS[selectedDay]}</p>
             </div>
           </div>
+
           <button
             onClick={() => setEditingPlan('new')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:bg-white/30"
             style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}
           >
             <Plus className="w-3.5 h-3.5" />Add Meal
           </button>
         </div>
+
         {/* Day pills */}
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
           {DAY_SHORT.map((d, i) => (
@@ -1129,6 +1185,21 @@ function MealPlanSection() {
         </div>
       </div>
 
+      {/* Banner Notice Alert */}
+      {bannerNotice && (
+        <div
+          className="mx-6 mt-4 p-3 rounded-2xl text-xs font-bold flex items-center justify-between gap-2 animate-fade-slide-up bg-green-50 border border-green-200 text-green-800"
+        >
+          <span className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-green-600" />
+            {bannerNotice}
+          </span>
+          <button onClick={() => setBannerNotice(null)} className="text-green-600 hover:text-green-800">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Plan content */}
       <div className="p-5 space-y-5">
         {isLoading ? (
@@ -1136,57 +1207,126 @@ function MealPlanSection() {
             <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--hl-green)' }} />
           </div>
         ) : dayPlans.length === 0 ? (
-          <div className="text-center py-12 space-y-3">
-            <Calendar className="w-10 h-10 mx-auto" style={{ color: 'var(--hl-text-tertiary)' }} />
-            <p className="text-sm font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>No meals planned for {DAYS[selectedDay]}</p>
-            <button onClick={() => setEditingPlan('new')} className="hl-btn-primary px-5 py-2 inline-flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" />Plan a Meal
+          <div className="text-center py-10 space-y-3 max-w-md mx-auto">
+            <div
+              className="w-14 h-14 rounded-3xl mx-auto flex items-center justify-center"
+              style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)' }}
+            >
+              <Calendar className="w-7 h-7" style={{ color: 'var(--hl-text-tertiary)' }} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
+                No meals planned for {DAYS[selectedDay]}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
+                Start planning your meals for the week by adding custom meals.
+              </p>
+            </div>
+            <button
+              onClick={() => setEditingPlan('new')}
+              className="hl-btn-primary px-4 py-2 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Meal
             </button>
           </div>
         ) : (
-          grouped.filter(g => g.items.length > 0).map(({ mealTime, items }) => {
-            const meta = CATEGORY_META[mealTime];
-            return (
-              <div key={mealTime}>
-                <div className="flex items-center gap-2 mb-2.5">
-                  <span className="text-base">{meta.emoji}</span>
-                  <span className="text-xs font-extrabold uppercase tracking-wider" style={{ color: meta.color }}>{meta.label}</span>
-                  <div className="flex-1 h-px" style={{ background: meta.border }} />
+          <div className="space-y-5">
+            {grouped.filter(g => g.items.length > 0).map(({ mealTime, items }) => {
+              const meta = CATEGORY_META[mealTime];
+              return (
+                <div key={mealTime}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className="text-base">{meta.emoji}</span>
+                    <span className="text-xs font-extrabold uppercase tracking-wider" style={{ color: meta.color }}>{meta.label}</span>
+                    <div className="flex-1 h-px" style={{ background: meta.border }} />
+                  </div>
+                  <div className="space-y-2.5">
+                    {items.map(plan => {
+                      const isLogged = loggedMealIds[plan.id];
+                      return (
+                        <div
+                          key={plan.id}
+                          className="flex items-center gap-3 p-3 rounded-2xl group transition-all"
+                          style={{ background: meta.bg, border: `1px solid ${meta.border}` }}
+                        >
+                          {plan.image ? (
+                            <img src={plan.image} alt={plan.name} className="w-12 h-12 rounded-xl object-cover shrink-0" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ background: 'var(--hl-surface)' }}>{meta.emoji}</div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold truncate" style={{ color: 'var(--hl-text-primary)' }}>{plan.name}</p>
+                            <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
+                              {plan.calories} kcal · {plan.protein}g P · {plan.carbs}g C · {plan.fat}g F
+                            </p>
+                            {plan.notes && (
+                              <p className="text-[10px] truncate mt-0.5" style={{ color: 'var(--hl-text-tertiary)' }}>
+                                💡 {plan.notes}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Action Buttons on Planned Meal */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleQuickLogToToday(plan)}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 flex items-center gap-1"
+                              style={{
+                                background: isLogged ? 'var(--hl-green)' : 'var(--hl-surface)',
+                                color: isLogged ? '#fff' : 'var(--hl-green)',
+                                border: '1px solid var(--hl-green-border)',
+                                boxShadow: 'var(--hl-shadow-xs)',
+                              }}
+                              title="Quick-log this planned meal directly into today's diary"
+                            >
+                              {isLogged ? (
+                                <><Check className="w-3.5 h-3.5" /> Logged</>
+                              ) : (
+                                <><Plus className="w-3.5 h-3.5" /> Log Today</>
+                              )}
+                            </button>
+
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => setEditingPlan(plan)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--hl-surface)', color: 'var(--hl-green)' }} title="Edit planned meal">
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => handleDelete(plan.id)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--hl-surface)', color: 'var(--hl-peach)' }} title="Delete planned meal">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="space-y-2.5">
-                  {items.map(plan => (
-                    <div
-                      key={plan.id}
-                      className="flex items-center gap-3 p-3 rounded-2xl group transition-all"
-                      style={{ background: meta.bg, border: `1px solid ${meta.border}` }}
-                    >
-                      {plan.image ? (
-                        <img src={plan.image} alt={plan.name} className="w-12 h-12 rounded-xl object-cover shrink-0" />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ background: 'var(--hl-surface)' }}>{meta.emoji}</div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate" style={{ color: 'var(--hl-text-primary)' }}>{plan.name}</p>
-                        <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
-                          {plan.calories} kcal · {plan.protein}g P · {plan.carbs}g C · {plan.fat}g F
-                        </p>
-                      </div>
-                      <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingPlan(plan)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--hl-surface)', color: 'var(--hl-green)' }}>
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button onClick={() => handleDelete(plan.id)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--hl-surface)', color: 'var(--hl-peach)' }}>
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              );
+            })}
+
+            {/* Bottom Quick Action: Log Entire Day */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl border" style={{ background: 'var(--hl-surface-alt)', borderColor: 'var(--hl-border-light)' }}>
+              <div className="text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
+                <span>{dayPlans.length} planned meals · </span>
+                <span className="font-bold" style={{ color: 'var(--hl-text-primary)' }}>{dayTotalCal} kcal</span>
               </div>
-            );
-          })
+              <div className="flex items-center gap-2">
+
+                <button
+                  onClick={handleLogAllToday}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 transition-transform hover:scale-105 shadow-sm"
+                  style={{ background: 'var(--hl-teal)' }}
+                  title="Log all meals planned for this day into your daily diary"
+                >
+                  <Utensils className="w-3 h-3" /> Log All Day to Diary
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
+
 
       {/* Edit/Create plan modal */}
       {editingPlan !== null && (
@@ -1345,7 +1485,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
           <BookOpen className="w-4 h-4" style={{ color: 'var(--hl-green)' }} />
           Weekly Meal Plan
         </h2>
-        <MealPlanSection />
+        <MealPlanSection onAddMeal={onAddMeal} selectedDate={selectedDate} />
       </div>
 
       {/* ── Log Meal Modal ───────────────────────────────────────────────── */}

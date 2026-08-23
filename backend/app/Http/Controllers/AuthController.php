@@ -112,6 +112,112 @@ class AuthController extends Controller
         ], 201);
     }
 
+    public function firebaseAuth(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'name' => 'nullable|string|max:255',
+            'avatar' => 'nullable|string',
+            'role' => 'nullable|string|in:member,coach,admin',
+            'gender' => 'nullable|string|in:female,male,other',
+            'weight_current_kg' => 'nullable|numeric',
+            'weight_target_kg' => 'nullable|numeric',
+            'height_cm' => 'nullable|integer',
+            'age' => 'nullable|integer',
+            'goal' => 'nullable|string',
+            'activity_level' => 'nullable|string',
+            'calories_goal' => 'nullable|integer',
+            'protein_goal_g' => 'nullable|integer',
+            'carbs_goal_g' => 'nullable|integer',
+            'fats_goal_g' => 'nullable|integer',
+            'water_goal_ml' => 'nullable|integer',
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $user = User::where('email', $email)->first();
+
+        $gender = $validated['gender'] ?? 'female';
+        $defaultAvatar = $gender === 'male'
+            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400'
+            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
+
+        if (!$user) {
+            $user = User::create([
+                'name' => $validated['name'] ?? explode('@', $email)[0],
+                'email' => $email,
+                'password' => Hash::make(\Illuminate\Support\Str::random(24)),
+                'role' => $validated['role'] ?? 'member',
+                'gender' => $gender,
+                'avatar' => $validated['avatar'] ?? $defaultAvatar,
+                'weight_current_kg' => $validated['weight_current_kg'] ?? null,
+                'weight_target_kg' => $validated['weight_target_kg'] ?? null,
+                'height_cm' => $validated['height_cm'] ?? null,
+                'age' => $validated['age'] ?? null,
+                'goal' => $validated['goal'] ?? 'wellness',
+                'activity_level' => $validated['activity_level'] ?? 'moderate',
+                'calories_goal' => $validated['calories_goal'] ?? ($gender === 'male' ? 2400 : 2000),
+                'protein_goal_g' => $validated['protein_goal_g'] ?? ($gender === 'male' ? 160 : 130),
+                'carbs_goal_g' => $validated['carbs_goal_g'] ?? ($gender === 'male' ? 260 : 200),
+                'fats_goal_g' => $validated['fats_goal_g'] ?? ($gender === 'male' ? 75 : 65),
+                'water_goal_ml' => $validated['water_goal_ml'] ?? ($gender === 'male' ? 3500 : 3000),
+            ]);
+
+            // Automatically assign default chat coaches for new member
+            $trainer = User::where('coach_specialty', 'trainer')->first();
+            if ($trainer) {
+                $convTrainer = \App\Models\Conversation::firstOrCreate([
+                    'member_id' => $user->id,
+                    'coach_id' => $trainer->id,
+                ]);
+                \App\Models\ChatMessage::create([
+                    'conversation_id' => $convTrainer->id,
+                    'sender_id' => $trainer->id,
+                    'body' => "Hi {$user->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
+                ]);
+            }
+
+            $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
+            if ($nutritionist && (!$trainer || $nutritionist->id !== $trainer->id)) {
+                $convNutri = \App\Models\Conversation::firstOrCreate([
+                    'member_id' => $user->id,
+                    'coach_id' => $nutritionist->id,
+                ]);
+                \App\Models\ChatMessage::create([
+                    'conversation_id' => $convNutri->id,
+                    'sender_id' => $nutritionist->id,
+                    'body' => "Welcome {$user->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
+                ]);
+            }
+        } else {
+            // Update name, avatar or biometrics if provided
+            $updates = [];
+            if (!empty($validated['name'])) $updates['name'] = $validated['name'];
+            if (!empty($validated['avatar']) && empty($user->avatar)) $updates['avatar'] = $validated['avatar'];
+            if (isset($validated['weight_current_kg'])) $updates['weight_current_kg'] = $validated['weight_current_kg'];
+            if (isset($validated['weight_target_kg'])) $updates['weight_target_kg'] = $validated['weight_target_kg'];
+            if (isset($validated['height_cm'])) $updates['height_cm'] = $validated['height_cm'];
+            if (isset($validated['age'])) $updates['age'] = $validated['age'];
+            if (isset($validated['goal'])) $updates['goal'] = $validated['goal'];
+            if (isset($validated['activity_level'])) $updates['activity_level'] = $validated['activity_level'];
+            if (isset($validated['calories_goal'])) $updates['calories_goal'] = $validated['calories_goal'];
+            if (isset($validated['protein_goal_g'])) $updates['protein_goal_g'] = $validated['protein_goal_g'];
+            if (isset($validated['carbs_goal_g'])) $updates['carbs_goal_g'] = $validated['carbs_goal_g'];
+            if (isset($validated['fats_goal_g'])) $updates['fats_goal_g'] = $validated['fats_goal_g'];
+            if (isset($validated['water_goal_ml'])) $updates['water_goal_ml'] = $validated['water_goal_ml'];
+
+            if (!empty($updates)) {
+                $user->update($updates);
+            }
+        }
+
+        $token = $user->createToken('api')->plainTextToken;
+
+        return response()->json([
+            'user' => $this->formatUser($user),
+            'token' => $token,
+        ]);
+    }
+
     public function me(Request $request)
     {
         return response()->json($this->formatUser($request->user()));

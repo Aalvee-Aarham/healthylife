@@ -5,6 +5,7 @@ import { MacrosCard } from '../dashboard/MacrosCard';
 import { TodaysFocusCard } from '../dashboard/TodaysFocusCard';
 import { CoachBanner } from '../dashboard/CoachBanner';
 import { QuickNavCards } from '../dashboard/QuickNavCards';
+import { FloatingQuickLog } from '../dashboard/FloatingQuickLog';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -15,6 +16,17 @@ interface DashboardViewProps {
   error: string | null;
   onSelectTab: (tab: NavigationTab) => void;
   onLogWater: (amountMl: number) => void;
+  onAddMeal?: (
+    name: string,
+    cal: number,
+    protein: number,
+    customCarbs?: number,
+    customFat?: number,
+    customImage?: string,
+    category?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  ) => Promise<void> | void;
+  isOpenExternalQuickLog?: boolean;
+  onCloseExternalQuickLog?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -25,6 +37,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   error,
   onSelectTab,
   onLogWater,
+  onAddMeal,
+  isOpenExternalQuickLog,
+  onCloseExternalQuickLog,
 }) => {
 
   if (isLoading) {
@@ -60,7 +75,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   return (
-    <div className="space-y-8 pb-16 animate-fade-slide-up">
+    <div className="space-y-8 pb-24 animate-fade-slide-up relative">
 
       {/* ══════════════════════════════════════════
           SECTION 1 — Welcome Hero Banner
@@ -90,6 +105,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           SECTION 4 — Coach CTA Banner
       ══════════════════════════════════════════ */}
       <CoachBanner onSelectTab={onSelectTab} />
+
+      {/* ══════════════════════════════════════════
+          SECTION 5 — Bottom Floating Quick Log Module
+      ══════════════════════════════════════════ */}
+      <FloatingQuickLog
+        macros={macros}
+        onLogWater={onLogWater}
+        onAddMeal={onAddMeal}
+        isOpenExternal={isOpenExternalQuickLog}
+        onCloseExternal={onCloseExternalQuickLog}
+      />
 
     </div>
   );

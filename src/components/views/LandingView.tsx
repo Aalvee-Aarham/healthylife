@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { NavigationTab } from '../../types';
 import { askGroqAI } from '../../services/groqApi';
-import { 
-  Sparkles, 
-  ArrowRight, 
-  ShieldCheck, 
-  Check, 
-  Zap, 
+import {
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Check,
+  Zap,
   User,
   Briefcase,
   Bot
@@ -38,15 +38,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
 
   return (
     <div className="space-y-16 pb-20">
-      
+
       {/* Light Theme Primary Hero Section */}
       <section className="relative overflow-hidden pt-8 pb-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-emerald-50/60 via-white to-slate-50 rounded-3xl border border-emerald-100 shadow-sm">
-        
+
         {/* Ambient Glow */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-emerald-400/10 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="max-w-5xl mx-auto text-center space-y-8 relative z-10">
-          
+
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-extrabold shadow-sm">
             <Sparkles className="w-4 h-4 text-emerald-600" />
             <span>HealthyLife Organic Tech & Bio-Hormonal Sync Ecosystem</span>
@@ -122,10 +122,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
           {/* Platform Stats */}
           <div className="pt-8 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
             {[
-              { label: 'Active Healthy Members', value: '14,280+' },
+              { label: 'Active Members in BD', value: '14,280+' },
               { label: 'AI Bio-Plans', value: '142,980+' },
               { label: 'CycleSync™ Accuracy', value: '99.4%' },
-              { label: 'Certified Coaches', value: '184+' }
+              { label: 'Certified Local Coaches', value: '184+' }
             ].map((stat, i) => (
               <div key={i} className="p-4 rounded-2xl bg-white/80 border border-slate-200 backdrop-blur-sm shadow-sm">
                 <p className="text-xl sm:text-2xl font-black text-slate-900">{stat.value}</p>
@@ -149,7 +149,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
+
           {/* Member Card */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 hover:border-emerald-300 transition-all flex flex-col justify-between">
             <div className="space-y-3">
@@ -232,7 +232,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center space-y-3 mb-10">
           <h2 className="text-3xl font-black text-slate-900">
-            HealthyLife Transparent Pricing
+            HealthyLife Transparent Pricing (BD)
           </h2>
           <p className="text-xs text-slate-500">
             Select the perfect plan for individual wellness or coaching businesses.
@@ -241,17 +241,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
           <div className="inline-flex items-center gap-2 bg-slate-100 p-1.5 rounded-full border border-slate-200 mt-2">
             <button
               onClick={() => setBillingCycle('monthly')}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                billingCycle === 'monthly' ? 'bg-emerald-600 text-white' : 'text-slate-600'
-              }`}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${billingCycle === 'monthly' ? 'bg-emerald-600 text-white' : 'text-slate-600'
+                }`}
             >
               Monthly
             </button>
             <button
               onClick={() => setBillingCycle('yearly')}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${
-                billingCycle === 'yearly' ? 'bg-emerald-600 text-white' : 'text-slate-600'
-              }`}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${billingCycle === 'yearly' ? 'bg-emerald-600 text-white' : 'text-slate-600'
+                }`}
             >
               <span>Yearly</span>
               <span className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold">Save 20%</span>
@@ -260,13 +258,13 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
+
           <div className="p-8 rounded-3xl bg-white border border-slate-200 space-y-6 shadow-sm">
             <div>
               <h3 className="text-lg font-bold text-slate-900">Free Tier</h3>
               <p className="text-xs text-slate-500 mt-1">Basic macro & workout logging.</p>
               <div className="mt-4">
-                <span className="text-4xl font-black text-slate-900">$0</span>
+                <span className="text-4xl font-black text-slate-900">৳0</span>
                 <span className="text-xs text-slate-500"> / forever</span>
               </div>
             </div>
@@ -292,7 +290,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
               <p className="text-xs text-slate-500 mt-1">Full CycleSync™ & AI Assistant.</p>
               <div className="mt-4">
                 <span className="text-4xl font-black text-slate-900">
-                  {billingCycle === 'yearly' ? '$14' : '$18'}
+                  {billingCycle === 'yearly' ? '৳200' : '৳250'}
                 </span>
                 <span className="text-xs text-slate-500"> / month</span>
               </div>
@@ -317,7 +315,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
               <p className="text-xs text-slate-500 mt-1">For trainers & nutrition coaches.</p>
               <div className="mt-4">
                 <span className="text-4xl font-black text-slate-900">
-                  {billingCycle === 'yearly' ? '$49' : '$59'}
+                  {billingCycle === 'yearly' ? '৳500' : '৳600'}
                 </span>
                 <span className="text-xs text-slate-500"> / month</span>
               </div>

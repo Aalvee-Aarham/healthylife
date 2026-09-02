@@ -37,6 +37,14 @@ const PRESET_WORKOUTS = [
 
 export const WorkoutsView: React.FC = () => {
   const [logs, setLogs] = useState<GymLog[]>([]);
+  const [gymStats, setGymStats] = useState({
+    totalWorkouts: 0,
+    totalSets: 0,
+    totalDurationMinutes: 0,
+    totalCaloriesBurned: 0,
+    avgSessionMinutes: 0,
+    consistentDays: [] as string[],
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -72,8 +80,20 @@ export const WorkoutsView: React.FC = () => {
     }
   };
 
+  /** Fetch aggregate stats from backend SQL (COUNT/SUM/AVG + INTERSECT).
+   *  No JavaScript arithmetic — all numbers come from the database. */
+  const fetchStats = async () => {
+    try {
+      const data = await api.gymStats();
+      setGymStats(data);
+    } catch (err) {
+      console.error('Failed to load gym stats:', err);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
+    fetchStats();
   }, []);
 
   const showToast = (msg: string) => {
@@ -184,6 +204,7 @@ export const WorkoutsView: React.FC = () => {
       });
 
       setLogs([newLog, ...logs]);
+      fetchStats();
       showToast(`Workout "${title}" saved successfully!`);
       
       // Reset form
@@ -230,19 +251,18 @@ export const WorkoutsView: React.FC = () => {
     try {
       await api.deleteGymLog(logId);
       setLogs(logs.filter((l) => l.id !== logId));
+      // Refresh aggregate stats from backend after deletion
+      fetchStats();
       showToast('Workout log deleted.');
     } catch (err) {
       console.error('Failed to delete gym log:', err);
-      // Fallback
       setLogs(logs.filter((l) => l.id !== logId));
       showToast('Workout log removed.');
     }
   };
 
-  // Calculate live statistics from actual logs
-  const totalWorkouts = logs.length;
-  const totalSets = logs.reduce((acc, log) => acc + (log.sets?.length || 0), 0);
-  const totalDuration = logs.reduce((acc, log) => acc + (log.durationMinutes || 0), 0);
+  // Calculate live statistics from backend SQL aggregates (not JavaScript .reduce())
+  // Stats are fetched from GET /gym-logs/stats (COUNT/SUM/AVG/INTERSECT in PostgreSQL)
 
   // Group sets by exercise name helper
   const groupSetsByExercise = (sets: GymLog['sets']) => {
@@ -323,7 +343,7 @@ export const WorkoutsView: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Workouts</p>
             <h3 className="text-2xl font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
-              {totalWorkouts}
+               {gymStats.totalWorkouts}
             </h3>
           </div>
         </div>
@@ -335,7 +355,7 @@ export const WorkoutsView: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sets Logged</p>
             <h3 className="text-2xl font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
-              {totalSets}
+               {gymStats.totalSets}
             </h3>
           </div>
         </div>
@@ -347,7 +367,7 @@ export const WorkoutsView: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Time</p>
             <h3 className="text-2xl font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
-              {totalDuration > 0 ? `${totalDuration}m` : '—'}
+               {gymStats.totalDurationMinutes > 0 ? `${gymStats.totalDurationMinutes}m` : '—'}
             </h3>
           </div>
         </div>

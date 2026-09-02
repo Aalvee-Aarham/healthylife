@@ -60,7 +60,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
           </h1>
 
           <p className="max-w-2xl mx-auto text-base sm:text-lg text-slate-600 leading-relaxed font-normal">
-            Harmonize workouts, AI nutrition, and hormonal cycle intelligence in one unified workspace for Members, Coaches, and Admins.
+            Harmonize workouts, AI nutrition, and hormonal cycle intelligence in one unified workspace for Members and Coaches.
           </p>
 
           {/* Action CTAs */}
@@ -144,7 +144,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
             Tailored Experiences for Every Role
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-xl mx-auto">
-            HealthyLife provides purpose-built interfaces for Members, Coaches, and System Admins.
+            HealthyLife provides purpose-built interfaces for Members and Coaches.
           </p>
         </div>
 

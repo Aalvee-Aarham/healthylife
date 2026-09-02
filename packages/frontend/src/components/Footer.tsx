@@ -46,9 +46,7 @@ export const Footer: React.FC<FooterProps> = ({ onSelectTab }) => {
           <p className="text-slate-900 font-bold uppercase tracking-wider text-[11px]">Roles & Workspaces</p>
           <ul className="space-y-1.5">
             <li><button onClick={() => onSelectTab('dashboard')} className="hover:text-emerald-600 transition-colors">👤 Member Dashboard</button></li>
-            <li><button onClick={() => onSelectTab('coach-dashboard')} className="hover:text-teal-600 transition-colors">🏋️ Coach Portal</button></li>
-            <li><button onClick={() => onSelectTab('admin-dashboard')} className="hover:text-purple-600 transition-colors">🛡️ Admin Suite</button></li>
-            <li><button onClick={() => onSelectTab('community')} className="hover:text-emerald-600 transition-colors">Community Leaderboard</button></li>
+            <li><button onClick={() => onSelectTab('chat')} className="hover:text-teal-600 transition-colors">🏋️ Coach Portal</button></li>
           </ul>
         </div>
 

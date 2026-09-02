@@ -43,12 +43,6 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
       '📊 Analyze client macro adherence drop and recovery suggestions',
       '📹 Form correction cues for Romanian Deadlift hip hinge',
       '💡 Nutritional audit template for high cortisol clients'
-    ],
-    admin: [
-      '⚡ Summarize platform AI token usage & latency',
-      '🛡️ Run community content safety audit check',
-      '📈 Recommend strategy to boost MRR & Coach conversions',
-      '⚙️ Server operational health and uptime status'
     ]
   };
 

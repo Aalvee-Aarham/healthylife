@@ -23,13 +23,20 @@ import { SignOutView } from './components/views/SignOutView';
 
 import { useDashboard } from './hooks/useDashboard';
 import { api, getAuthToken, setAuthToken } from './services/api';
-
-import {
-  demoProfiles,
-  initialMacros,
-  mockMeals,
-} from './data/mockData';
 import { DailyMacros, MealItem } from './types';
+
+const defaultMacros: DailyMacros = {
+  caloriesConsumed: 0,
+  caloriesGoal: 2000,
+  proteinConsumedG: 0,
+  proteinGoalG: 120,
+  carbsConsumedG: 0,
+  carbsGoalG: 220,
+  fatsConsumedG: 0,
+  fatsGoalG: 65,
+  waterConsumedMl: 0,
+  waterGoalMl: 2500,
+};
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -68,9 +75,9 @@ export default function App() {
     }
   }, [user, currentTab]);
 
-  // Local state for views that don't yet use API hooks
-  const [macros, setMacros] = useState<DailyMacros>(initialMacros);
-  const [meals, setMeals] = useState<MealItem[]>(mockMeals);
+  // Local state for guest/offline fallback
+  const [macros, setMacros] = useState<DailyMacros>(defaultMacros);
+  const [meals, setMeals] = useState<MealItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Dashboard hook (real API when logged in)
@@ -83,7 +90,7 @@ export default function App() {
     if (targetTab) {
       setCurrentTab(targetTab);
     } else if (profile.role === 'coach') {
-      setCurrentTab('coach-dashboard');
+      setCurrentTab('chat');
     } else {
       setCurrentTab('dashboard');
     }
@@ -270,19 +277,9 @@ export default function App() {
               </>
             )}
 
-            {/* === COACH VIEWS === */}
+            {/* === COACH VIEWS (Pure Minimalistic Chat) === */}
             {user.role === 'coach' && (
-              <>
-                {currentTab === 'coach-dashboard' && (
-                  <CoachDashboardView user={user} />
-                )}
-                {(currentTab === 'clients' || currentTab === 'consultations' || currentTab === 'plan-builder') && (
-                  <CoachView clients={[]} sessions={[]} activeTab={currentTab} />
-                )}
-                {currentTab === 'chat' && (
-                  <ChatView user={user} />
-                )}
-              </>
+              <CoachDashboardView user={user} />
             )}
 
             {/* === SHARED VIEWS === */}
@@ -315,7 +312,7 @@ export default function App() {
       <Navbar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
-        user={user ?? demoProfiles.member}
+        user={user}
         isLoggedIn={isLoggedIn}
         onLogout={handleLogout}
       />

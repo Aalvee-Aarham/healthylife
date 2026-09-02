@@ -9,12 +9,13 @@ import {
   LogOut, 
   ChevronDown,
   LayoutDashboard,
+  MessageSquare,
 } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: NavigationTab;
   onSelectTab: (tab: NavigationTab) => void;
-  user: UserProfile;
+  user: UserProfile | null;
   isLoggedIn: boolean;
   onLogout: () => void;
 }
@@ -43,13 +44,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Logged-in nav
   const loggedInNav: NavItem[] = [
     { 
-      id: user.role === 'coach' ? 'coach-dashboard' : 'dashboard', 
-      label: 'Dashboard', 
-      icon: LayoutDashboard 
+      id: user?.role === 'coach' ? 'chat' : 'dashboard', 
+      label: user?.role === 'coach' ? 'Client Chat' : 'Dashboard', 
+      icon: user?.role === 'coach' ? MessageSquare : LayoutDashboard 
     }
   ];
 
-  const navItems = isLoggedIn ? loggedInNav : publicNav;
+  const navItems = isLoggedIn && user ? loggedInNav : publicNav;
 
   return (
     <header
@@ -66,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => onSelectTab(isLoggedIn ? (user.role === 'coach' ? 'coach-dashboard' : 'dashboard') : 'home')}
+              onClick={() => onSelectTab(isLoggedIn ? (user.role === 'coach' ? 'chat' : 'dashboard') : 'home')}
               className="flex items-center gap-2.5 group focus:outline-none"
             >
               <div
@@ -198,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="space-y-1">
                       <button
                         onClick={() => {
-                          onSelectTab(user.role === 'coach' ? 'coach-dashboard' : 'dashboard');
+                          onSelectTab(user.role === 'coach' ? 'chat' : 'dashboard');
                           setShowProfileMenu(false);
                         }}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-left transition-colors"
@@ -206,8 +207,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface-alt)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
-                        <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--hl-green)' }} />
-                        <span>Dashboard</span>
+                        {user.role === 'coach' ? (
+                          <>
+                            <MessageSquare className="w-4 h-4" style={{ color: 'var(--hl-green)' }} />
+                            <span>Client Chat</span>
+                          </>
+                        ) : (
+                          <>
+                            <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--hl-green)' }} />
+                            <span>Dashboard</span>
+                          </>
+                        )}
                       </button>
 
                       <button

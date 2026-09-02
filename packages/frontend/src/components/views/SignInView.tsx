@@ -27,7 +27,7 @@ export const SignInView: React.FC<SignInViewProps> = ({ onLoginSuccess, onSelect
       const { user, token } = await api.login(email, password);
       setAuthToken(token);
 
-      const targetTab: NavigationTab = user.role === 'coach' ? 'coach-dashboard' : 'dashboard';
+      const targetTab: NavigationTab = user.role === 'coach' ? 'chat' : 'dashboard';
       onLoginSuccess(user, targetTab);
     } catch (err: any) {
       // Detect network/server errors vs credential errors
@@ -57,7 +57,7 @@ export const SignInView: React.FC<SignInViewProps> = ({ onLoginSuccess, onSelect
       const { user, token } = await api.firebaseAuth({ ...profilePayload, role });
       setAuthToken(token);
 
-      const targetTab: NavigationTab = user.role === 'coach' ? 'coach-dashboard' : 'dashboard';
+      const targetTab: NavigationTab = user.role === 'coach' ? 'chat' : 'dashboard';
       onLoginSuccess(user, targetTab);
     } catch (err: any) {
       const msg: string = err?.message ?? 'Unknown error';

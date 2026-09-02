@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { UserRole, UserProfile, NavigationTab } from '../types';
-import { demoProfiles } from '../data/mockData';
 import { signInWithGoogle, signInWithEmail } from '../services/firebase';
 import { api, setAuthToken } from '../services/api';
 import { Sparkles, ShieldCheck, User, Briefcase, Lock, Mail, ArrowRight, X, AlertCircle } from 'lucide-react';
@@ -40,27 +39,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         role: selectedRole,
       };
 
-      try {
-        const res = await api.firebaseAuth(payload);
-        setAuthToken(res.token);
-        const targetTab: NavigationTab = res.user.role === 'coach' ? 'coach-dashboard' : res.user.role === 'admin' ? 'dashboard' : 'dashboard';
-        onLoginSuccess(res.user, targetTab);
-        onClose();
-      } catch {
-        // Fallback if backend server is offline
-        const targetTab: NavigationTab = selectedRole === 'coach' ? 'coach-dashboard' : selectedRole === 'admin' ? 'dashboard' : 'dashboard';
-        const profile: UserProfile = {
-          id: fbUser.uid || `u_${Date.now()}`,
-          name: fbUser.displayName || 'HealthyLife Member',
-          email: fbUser.email || '',
-          avatar: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&fit=crop&crop=face',
-          role: selectedRole,
-          gender: 'female',
-          streakDays: 1,
-        };
-        onLoginSuccess(profile, targetTab);
-        onClose();
-      }
+      const res = await api.firebaseAuth(payload);
+      setAuthToken(res.token);
+      const targetTab: NavigationTab = res.user.role === 'coach' ? 'chat' : 'dashboard';
+      onLoginSuccess(res.user, targetTab);
+      onClose();
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user') {
         setErrorMessage(err?.message || 'Google sign-in failed.');
@@ -84,41 +67,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         console.warn('Firebase email auth notice:', fbErr?.message);
       }
 
-      try {
-        const { user, token } = await api.login(cleanEmail, cleanPassword);
-        setAuthToken(token);
-        const targetTab: NavigationTab = user.role === 'coach' ? 'coach-dashboard' : user.role === 'admin' ? 'dashboard' : 'dashboard';
-        onLoginSuccess(user, targetTab);
-        onClose();
-        return;
-      } catch {
-        // Fallback check demo credentials
-        if (cleanEmail === 'admin@gmail.com' && cleanPassword === 'admin1234') {
-          onLoginSuccess(demoProfiles.admin, 'dashboard');
-          onClose();
-          return;
-        } else if (cleanEmail === 'coach@gmail.com' && cleanPassword === 'coach1234') {
-          onLoginSuccess(demoProfiles.coach, 'coach-dashboard');
-          onClose();
-          return;
-        } else if (cleanEmail === 'member@gmail.com' && cleanPassword === 'member1234') {
-          onLoginSuccess(demoProfiles.member, 'dashboard');
-          onClose();
-          return;
-        }
-        throw new Error('Invalid credentials or backend unreachable.');
-      }
+      const { user, token } = await api.login(cleanEmail, cleanPassword);
+      setAuthToken(token);
+      const targetTab: NavigationTab = user.role === 'coach' ? 'chat' : 'dashboard';
+      onLoginSuccess(user, targetTab);
+      onClose();
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Invalid credentials.');
+      setErrorMessage(err?.message || 'Invalid email or password.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleDemoLogin = (role: UserRole) => {
-    const targetTab = role === 'admin' ? 'admin-dashboard' : role === 'coach' ? 'coach-dashboard' : 'dashboard';
-    onLoginSuccess(demoProfiles[role], targetTab);
-    onClose();
   };
 
   return (
@@ -143,55 +101,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             {activeTab === 'login' ? 'Sign In to Your Account' : 'Create HealthyLife Account'}
           </h2>
           <p className="text-xs text-slate-500">
-            Choose your role or sign in with your credentials to access your personalized workspace.
+            Sign in with your credentials to access your personalized workspace.
           </p>
-        </div>
-
-        {/* 1-Click Quick Demo Login Profiles */}
-        <div className="space-y-2 pt-1">
-          <p className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
-            ⚡ Instant 1-Click Role Login
-          </p>
-
-          <div className="grid grid-cols-3 gap-2">
-            
-            {/* Member */}
-            <button
-              onClick={() => handleDemoLogin('member')}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-slate-900 transition-all hover:scale-[1.02] text-center space-y-1.5"
-            >
-              <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs shadow-md">
-                <User className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold block">Member</span>
-              <span className="text-[10px] text-emerald-700 font-medium leading-tight">Sarah J.</span>
-            </button>
-
-            {/* Coach */}
-            <button
-              onClick={() => handleDemoLogin('coach')}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-teal-50 hover:bg-teal-100 border border-teal-200 text-slate-900 transition-all hover:scale-[1.02] text-center space-y-1.5"
-            >
-              <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs shadow-md">
-                <Briefcase className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold block">Coach</span>
-              <span className="text-[10px] text-teal-700 font-medium leading-tight">Dr. Alex</span>
-            </button>
-
-            {/* Admin */}
-            <button
-              onClick={() => handleDemoLogin('admin')}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-slate-900 transition-all hover:scale-[1.02] text-center space-y-1.5"
-            >
-              <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-xs shadow-md">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold block">Admin</span>
-              <span className="text-[10px] text-purple-700 font-medium leading-tight">Marcus V.</span>
-            </button>
-
-          </div>
         </div>
 
         {/* Google Sign-in */}
@@ -287,8 +198,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Select Role Account Type
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['member', 'coach', 'admin'] as UserRole[]).map((r) => (
+            <div className="grid grid-cols-2 gap-2">
+              {(['member', 'coach'] as UserRole[]).map((r) => (
                 <button
                   type="button"
                   key={r}

@@ -88,8 +88,24 @@ export const api = {
 
   // ── Meals ───────────────────────────────────────────────────────────────────
 
-  getMeals: (date?: string) =>
-    get<any[]>(`/meals${date ? `?date=${date}` : ''}`),
+  getMeals: (date?: string, category?: string) =>
+    get<any[]>(
+      `/meals${date || category ? '?' : ''}${date ? `date=${date}` : ''}${
+        date && category ? '&' : ''
+      }${category ? `category=${encodeURIComponent(category)}` : ''}`
+    ),
+
+  /** Per-category SQL aggregate: mealCount, totalCalories, totalProtein, totalCarbs, totalFat.
+   *  Computed with GROUP BY + SUM in SQL — no JS reduce needed on the frontend. */
+  getMealsByCategory: (date?: string) =>
+    get<Array<{
+      category: string;
+      mealCount: number;
+      totalCalories: number;
+      totalProtein: number;
+      totalCarbs: number;
+      totalFat: number;
+    }>>(`/meals/by-category${date ? `?date=${date}` : ''}`),
 
   addMeal: (data: Record<string, unknown>) =>
     post<any>('/meals', data),
@@ -135,6 +151,18 @@ export const api = {
   getGymLogs: () =>
     get<any[]>('/gym-logs'),
 
+  /** Aggregate stats from the backend: totalWorkouts, totalSets, totalDuration, etc.
+   *  Computed in SQL (COUNT/SUM/AVG + INTERSECT) — no JS arithmetic needed. */
+  gymStats: () =>
+    get<{
+      totalWorkouts: number;
+      totalSets: number;
+      totalDurationMinutes: number;
+      totalCaloriesBurned: number;
+      avgSessionMinutes: number;
+      consistentDays: string[];
+    }>('/gym-logs/stats'),
+
   addGymLog: (data: Record<string, unknown>) =>
     post<any>('/gym-logs', data),
 
@@ -148,6 +176,28 @@ export const api = {
 
   getCycleStatus: () =>
     get<any>('/cycle/status'),
+
+  /** SQL Aggregators + LEFT JOIN analytics: totalPeriodsLogged, avgPeriodDurationDays, topSymptoms */
+  getCycleAnalytics: () =>
+    get<{
+      totalPeriodsLogged: number;
+      avgPeriodDurationDays: number;
+      firstPeriodDate: string | null;
+      latestPeriodDate: string | null;
+      totalSymptomsDuringMenstruation: number;
+      topSymptoms: Array<{ symptomKey: string; occurrences: number; lastLoggedOn: string }>;
+      flowDistribution: Array<{ flow: string; count: number }>;
+    }>('/cycle/analytics'),
+
+  /** SQL UNION ALL chronological cycle events timeline */
+  getCycleTimeline: () =>
+    get<Array<{
+      eventDate: string;
+      eventType: string;
+      title: string;
+      phaseTag: string;
+      refId: string | null;
+    }>>('/cycle/timeline'),
 
   getCyclePeriods: () =>
     get<any[]>('/cycle/periods'),
@@ -183,6 +233,10 @@ export const api = {
 
   // ── Coach Dashboard ─────────────────────────────────────────────────────────
 
-  getClients: () =>
-    get<any[]>('/coach/clients'),
+  /** Server-side filtered list of clients (UNION SQL query).
+   *  Pass `search` to filter by name in SQL (ILIKE) — no JS .filter() needed. */
+  getClients: (search?: string) =>
+    get<{ clients: any[]; totalClients: number; avgAdherencePct: number }>(
+      `/coach/clients${search ? `?search=${encodeURIComponent(search)}` : ''}`
+    ),
 };

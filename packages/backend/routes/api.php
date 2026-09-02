@@ -26,11 +26,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'summary']);
 
     // Meals
-    Route::get('/meals',              [MealController::class, 'index']);
-    Route::post('/meals',             [MealController::class, 'store']);
-    Route::patch('/meals/{meal}',     [MealController::class, 'update']);
-    Route::delete('/meals/{meal}',    [MealController::class, 'destroy']);
-    Route::post('/meals/{meal}/toggle', [MealController::class, 'toggle']);
+    Route::get('/meals',                 [MealController::class, 'index']);
+    Route::get('/meals/by-category',     [MealController::class, 'byCategory']); // static route BEFORE {meal}
+    Route::post('/meals',                [MealController::class, 'store']);
+    Route::patch('/meals/{meal}',        [MealController::class, 'update']);
+    Route::delete('/meals/{meal}',       [MealController::class, 'destroy']);
+    Route::post('/meals/{meal}/toggle',  [MealController::class, 'toggle']);
 
     // Meal Plans
     Route::get('/meal-plans',                    [MealPlanController::class, 'index']);
@@ -45,12 +46,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Gym Logs
     Route::get('/gym-logs',                              [GymLogController::class, 'index']);
+    Route::get('/gym-logs/stats',                        [GymLogController::class, 'stats']); // static route BEFORE {gymLog}
     Route::post('/gym-logs',                             [GymLogController::class, 'store']);
     Route::delete('/gym-logs/{gymLog}',                  [GymLogController::class, 'destroy']);
     Route::post('/gym-logs/{gymLog}/sets/{set}/toggle',  [GymLogController::class, 'toggleSet']);
 
     // Cycle Tracker
     Route::get('/cycle/status',                [CycleController::class, 'status']);
+    Route::get('/cycle/analytics',             [CycleController::class, 'analytics']); // SQL aggregates + LEFT JOIN
+    Route::get('/cycle/timeline',              [CycleController::class, 'timeline']);  // SQL UNION ALL
     Route::get('/cycle/periods',               [CycleController::class, 'periods']);
     Route::post('/cycle/periods',              [CycleController::class, 'logPeriod']);
     Route::patch('/cycle/periods/{period}',    [CycleController::class, 'updatePeriod']);

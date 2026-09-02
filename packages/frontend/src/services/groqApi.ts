@@ -9,13 +9,12 @@ export interface GroqChatMessage {
 
 export async function askGroqAI(
   userQuery: string,
-  userRole: 'member' | 'coach' | 'admin' = 'member',
+  userRole: 'member' | 'coach' = 'member',
   contextData?: string
 ): Promise<string> {
   const systemPrompts = {
     member: `You are HealthyLife AI, an expert, empathetic, and science-backed holistic health, nutrition, workout, and cycle-syncing wellness advisor. Provide practical, inspiring, and direct answers tailored to the user's goals. Format with clear bullet points and bold key recommendations. Keep answers concise, actionable, and engaging.`,
-    coach: `You are HealthyLife Pro AI Coach Diagnostic Assistant. You help certified coaches craft personalized client routines, analyze bio-feedback data, identify form mistakes, and optimize macro/micro nutrient targets. Output structured, professional recommendations for client management.`,
-    admin: `You are HealthyLife System Intelligence Advisor for platform administrators. You analyze platform analytics, user engagement metrics, AI API token efficiency, content safety flags, and financial growth data. Provide concise executive summaries with strategic recommendations.`
+    coach: `You are HealthyLife Pro AI Coach Diagnostic Assistant. You help certified coaches craft personalized client routines, analyze bio-feedback data, identify form mistakes, and optimize macro/micro nutrient targets. Output structured, professional recommendations for client management.`
   };
 
   const messages: GroqChatMessage[] = [
@@ -82,12 +81,6 @@ function generateLocalFallback(query: string, role: string): string {
 - **Recovery Note**: Suggest 10-minute soft foam rolling post-session to reduce delayed onset muscle soreness (DOMS).`;
   }
 
-  if (role === 'admin') {
-    return `### 📊 HealthyLife System Intelligence
-- **Platform Health**: Operating at 99.98% uptime. Active user sessions +18% WoW.
-- **AI Token Utilization**: Llama-3.3-70b AI Engine response latency averaging 180ms.
-- **Recommendation**: Promote the new CycleSync™ AI features to increase member retention by estimated 12%.`;
-  }
 
   // Member default responses
   if (q.includes('workout') || q.includes('exercise')) {

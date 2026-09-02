@@ -1,7 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DailyMacros, MealItem, WaterLogEntry } from '../types';
 import { api } from '../services/api';
-import { initialMacros, mockMeals } from '../data/mockData';
+
+const defaultMacros: DailyMacros = {
+  caloriesConsumed: 0,
+  caloriesGoal: 2000,
+  proteinConsumedG: 0,
+  proteinGoalG: 120,
+  carbsConsumedG: 0,
+  carbsGoalG: 220,
+  fatsConsumedG: 0,
+  fatsGoalG: 65,
+  waterConsumedMl: 0,
+  waterGoalMl: 2500,
+};
 
 export interface DashboardData {
   macros: DailyMacros;
@@ -18,8 +30,8 @@ export function useDashboard(isLoggedIn: boolean, dateStr?: string): DashboardDa
   toggleMeal: (id: string) => Promise<void>;
   refetch: () => void;
 } {
-  const [macros, setMacros] = useState<DailyMacros>(initialMacros);
-  const [meals, setMeals] = useState<MealItem[]>(mockMeals);
+  const [macros, setMacros] = useState<DailyMacros>(defaultMacros);
+  const [meals, setMeals] = useState<MealItem[]>([]);
   const [waterLogs, setWaterLogs] = useState<WaterLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,14 +75,10 @@ export function useDashboard(isLoggedIn: boolean, dateStr?: string): DashboardDa
 
   const addMeal = useCallback(async (data: any) => {
     const newMeal = await api.addMeal(data);
+    // Optimistically prepend the new meal for instant UI feedback
     setMeals((prev) => [newMeal, ...prev]);
-    setMacros((prev) => ({
-      ...prev,
-      caloriesConsumed: prev.caloriesConsumed + newMeal.calories,
-      proteinConsumedG: prev.proteinConsumedG + newMeal.protein,
-      carbsConsumedG: prev.carbsConsumedG + newMeal.carbs,
-      fatsConsumedG: prev.fatsConsumedG + newMeal.fat,
-    }));
+    // Re-fetch macro totals from backend SQL SUM aggregates — no JS arithmetic
+    setTick((t) => t + 1);
   }, []);
 
   const toggleMeal = useCallback(async (id: string) => {

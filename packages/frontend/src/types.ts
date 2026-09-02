@@ -1,4 +1,4 @@
-export type UserRole = 'member' | 'coach' | 'admin';
+export type UserRole = 'member' | 'coach';
 
 export type CoachSpecialty = 'nutritionist' | 'trainer';
 
@@ -15,7 +15,6 @@ export type NavigationTab =
   | 'chat'
   | 'cycle'
   | 'coach-dashboard'
-  | 'admin-dashboard'
   | 'clients'
   | 'consultations'
   | 'plan-builder';

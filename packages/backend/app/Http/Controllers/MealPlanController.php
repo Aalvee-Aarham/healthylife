@@ -2,30 +2,36 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MealPlan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MealPlanController extends Controller
 {
     /**
      * GET /meal-plans
-     * Returns the full weekly meal plan for the authenticated user,
-     * grouped by day_of_week (0=Sun … 6=Sat) then by meal_time.
+     *
+     * Raw SQL SELECT ordered by day_of_week and meal_time via CASE expression.
      */
     public function index(Request $request)
     {
-        $plans = MealPlan::where('user_id', $request->user()->id)
-            ->orderBy('day_of_week')
-            ->orderBy('meal_time')
-            ->get()
-            ->map(fn(MealPlan $p) => $this->format($p));
+        $rows = DB::select(
+            "SELECT id, day_of_week, meal_time, name, calories, protein, carbs, fat, image, notes
+             FROM meal_plans
+             WHERE user_id = ?
+             ORDER BY day_of_week ASC,
+                CASE meal_time
+                    WHEN 'breakfast' THEN 1
+                    WHEN 'lunch'     THEN 2
+                    WHEN 'dinner'    THEN 3
+                    WHEN 'snack'     THEN 4
+                    ELSE 5
+                END",
+            [$request->user()->id]
+        );
 
-        return response()->json($plans);
+        return response()->json(array_map(fn($p) => $this->format($p), $rows));
     }
 
-    /**
-     * POST /meal-plans
-     */
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -40,28 +46,37 @@ class MealPlanController extends Controller
             'notes'       => 'nullable|string|max:500',
         ]);
 
-        $plan = MealPlan::create([
-            'user_id'     => $request->user()->id,
-            'day_of_week' => $data['day_of_week'],
-            'meal_time'   => $data['meal_time'],
-            'name'        => $data['name'],
-            'calories'    => $data['calories'],
-            'protein'     => $data['protein'],
-            'carbs'       => $data['carbs'] ?? round($data['calories'] * 0.45 / 4),
-            'fat'         => $data['fat'] ?? round($data['calories'] * 0.30 / 9),
-            'image'       => $data['image'] ?? null,
-            'notes'       => $data['notes'] ?? null,
-        ]);
+        $carbs = $data['carbs'] ?? (int) round($data['calories'] * 0.45 / 4);
+        $fat   = $data['fat']   ?? (int) round($data['calories'] * 0.30 / 9);
 
-        return response()->json($this->format($plan), 201);
+        // PostgreSQL INSERT … RETURNING * — insert and get row back in one query
+        $rows = DB::select(
+            'INSERT INTO meal_plans
+                (user_id, day_of_week, meal_time, name, calories, protein, carbs, fat, image, notes, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+             RETURNING *',
+            [
+                $request->user()->id,
+                $data['day_of_week'],
+                $data['meal_time'],
+                $data['name'],
+                $data['calories'],
+                $data['protein'],
+                $carbs,
+                $fat,
+                $data['image'] ?? null,
+                $data['notes'] ?? null,
+            ]
+        );
+
+        return response()->json($this->format($rows[0]), 201);
     }
 
-    /**
-     * PATCH /meal-plans/{mealPlan}
-     */
-    public function update(Request $request, MealPlan $mealPlan)
+    public function update(Request $request, int $mealPlan)
     {
-        abort_unless($mealPlan->user_id === $request->user()->id, 403);
+        // Raw SQL ownership check
+        $existing = DB::selectOne('SELECT user_id FROM meal_plans WHERE id = ?', [$mealPlan]);
+        abort_unless($existing && (int) $existing->user_id === (int) $request->user()->id, 403);
 
         $data = $request->validate([
             'day_of_week' => 'sometimes|integer|min:0|max:6',
@@ -75,36 +90,40 @@ class MealPlanController extends Controller
             'notes'       => 'nullable|string|max:500',
         ]);
 
-        $mealPlan->update($data);
+        if (!empty($data)) {
+            $data['updated_at'] = now()->toDateTimeString();
+            $setClauses  = implode(', ', array_map(fn($k) => "$k = ?", array_keys($data)));
+            $bindings    = array_values($data);
+            $bindings[]  = $mealPlan;
+            DB::statement("UPDATE meal_plans SET $setClauses WHERE id = ?", $bindings);
+        }
 
-        return response()->json($this->format($mealPlan->fresh()));
+        $updated = DB::selectOne('SELECT * FROM meal_plans WHERE id = ?', [$mealPlan]);
+        return response()->json($this->format($updated));
     }
 
-    /**
-     * DELETE /meal-plans/{mealPlan}
-     */
-    public function destroy(Request $request, MealPlan $mealPlan)
+    public function destroy(Request $request, int $mealPlan)
     {
-        abort_unless($mealPlan->user_id === $request->user()->id, 403);
+        $existing = DB::selectOne('SELECT user_id FROM meal_plans WHERE id = ?', [$mealPlan]);
+        abort_unless($existing && (int) $existing->user_id === (int) $request->user()->id, 403);
 
-        $mealPlan->delete();
-
+        DB::statement('DELETE FROM meal_plans WHERE id = ?', [$mealPlan]);
         return response()->json(['success' => true]);
     }
 
-    private function format(MealPlan $plan): array
+    private function format(object $plan): array
     {
         return [
-            'id'          => (string) $plan->id,
-            'dayOfWeek'   => $plan->day_of_week,
-            'mealTime'    => $plan->meal_time,
-            'name'        => $plan->name,
-            'calories'    => $plan->calories,
-            'protein'     => $plan->protein,
-            'carbs'       => $plan->carbs,
-            'fat'         => $plan->fat,
-            'image'       => $plan->image ?? '',
-            'notes'       => $plan->notes ?? '',
+            'id'        => (string) $plan->id,
+            'dayOfWeek' => (int) $plan->day_of_week,
+            'mealTime'  => $plan->meal_time,
+            'name'      => $plan->name,
+            'calories'  => (int) $plan->calories,
+            'protein'   => (int) $plan->protein,
+            'carbs'     => (int) $plan->carbs,
+            'fat'       => (int) $plan->fat,
+            'image'     => $plan->image ?? '',
+            'notes'     => $plan->notes ?? '',
         ];
     }
 }

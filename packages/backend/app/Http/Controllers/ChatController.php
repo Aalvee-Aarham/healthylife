@@ -2,206 +2,402 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ChatMessage;
-use App\Models\Conversation;
-use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 
 class ChatController extends Controller
 {
+    /**
+     * GET /chat/conversations
+     *
+     * Member path: LEFT JOIN conversations → coach users + LATERAL subquery for last message.
+     * Coach path:  LEFT JOIN conversations → member users + LATERAL subquery for last message.
+     *
+     * A LATERAL JOIN lets us correlate the last-message subquery per conversation row
+     * without a separate query per conversation (eliminates N+1).
+     */
     public function conversations(Request $request)
     {
         $user = $request->user();
 
         if ($user->isMember()) {
-            $this->ensureDefaultCoachConversations($user);
+            $this->ensureDefaultCoachConversations($user->id, $user->name);
 
-            $conversations = Conversation::where('member_id', $user->id)
-                ->with(['coach', 'messages' => fn ($q) => $q->latest()->limit(1)])
-                ->get();
+            $rows = DB::select(
+                "SELECT
+                    c.id                  AS conv_id,
+                    coach.id              AS partner_id,
+                    coach.name            AS partner_name,
+                    coach.avatar          AS partner_avatar,
+                    coach.role            AS partner_role,
+                    coach.coach_specialty AS partner_specialty,
+                    coach.title           AS partner_title,
+                    lm.id                 AS last_msg_id,
+                    lm.body               AS last_msg_body,
+                    lm.sender_id          AS last_msg_sender_id,
+                    lm.created_at         AS last_msg_time
+                 FROM conversations c
+                 LEFT JOIN users coach ON coach.id = c.coach_id
+                 LEFT JOIN LATERAL (
+                     SELECT id, body, sender_id, created_at
+                     FROM chat_messages
+                     WHERE conversation_id = c.id
+                     ORDER BY created_at DESC
+                     LIMIT 1
+                 ) lm ON true
+                 WHERE c.member_id = ?
+                 ORDER BY lm.created_at DESC NULLS LAST",
+                [$user->id]
+            );
         } else {
-            $conversations = Conversation::where('coach_id', $user->id)
-                ->with(['member', 'messages' => fn ($q) => $q->latest()->limit(1)])
-                ->get();
+            // Coach view: LEFT JOIN conversations with member user data
+            $rows = DB::select(
+                "SELECT
+                    c.id          AS conv_id,
+                    m.id          AS partner_id,
+                    m.name        AS partner_name,
+                    m.avatar      AS partner_avatar,
+                    m.role        AS partner_role,
+                    NULL          AS partner_specialty,
+                    NULL          AS partner_title,
+                    lm.id         AS last_msg_id,
+                    lm.body       AS last_msg_body,
+                    lm.sender_id  AS last_msg_sender_id,
+                    lm.created_at AS last_msg_time
+                 FROM conversations c
+                 LEFT JOIN users m ON m.id = c.member_id
+                 LEFT JOIN LATERAL (
+                     SELECT id, body, sender_id, created_at
+                     FROM chat_messages
+                     WHERE conversation_id = c.id
+                     ORDER BY created_at DESC
+                     LIMIT 1
+                 ) lm ON true
+                 WHERE c.coach_id = ?
+                 ORDER BY lm.created_at DESC NULLS LAST",
+                [$user->id]
+            );
         }
 
-        return response()->json($conversations->map(fn (Conversation $c) => [
-            'id' => (string) $c->id,
-            'partner' => $user->isMember()
-                ? $this->formatPartner($c->coach)
-                : $this->formatPartner($c->member),
-            'lastMessage' => $c->messages->first()
-                ? $this->formatMessage($c->messages->first(), $user)
-                : null,
-        ]));
-    }
+        $userId = $user->id;
 
-    private function ensureDefaultCoachConversations(User $member): void
-    {
-        // 1. Trainer Coach
-        $trainer = User::where('coach_specialty', 'trainer')->first();
-        if (!$trainer) {
-            $trainer = User::where('role', 'coach')->first();
-        }
-        if ($trainer) {
-            $convTrainer = Conversation::firstOrCreate([
-                'member_id' => $member->id,
-                'coach_id' => $trainer->id,
-            ]);
-
-            if ($convTrainer->messages()->count() === 0) {
-                ChatMessage::create([
-                    'conversation_id' => $convTrainer->id,
-                    'sender_id' => $trainer->id,
-                    'body' => "Hi {$member->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
-                ]);
+        return response()->json(array_map(function ($c) use ($userId) {
+            $lastMessage = null;
+            if ($c->last_msg_id) {
+                $lastMessage = [
+                    'id'       => (string) $c->last_msg_id,
+                    'senderId' => (string) $c->last_msg_sender_id,
+                    'body'     => $c->last_msg_body,
+                    'time'     => Carbon::parse($c->last_msg_time)->format('g:i A'),
+                    'isMine'   => (string) $c->last_msg_sender_id === (string) $userId,
+                ];
             }
-        }
 
-        // 2. Nutritionist Coach
-        $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
-        if ($nutritionist && (!$trainer || $nutritionist->id !== $trainer->id)) {
-            $convNutri = Conversation::firstOrCreate([
-                'member_id' => $member->id,
-                'coach_id' => $nutritionist->id,
-            ]);
-
-            if ($convNutri->messages()->count() === 0) {
-                ChatMessage::create([
-                    'conversation_id' => $convNutri->id,
-                    'sender_id' => $nutritionist->id,
-                    'body' => "Welcome {$member->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
-                ]);
-            }
-        }
+            return [
+                'id'          => (string) $c->conv_id,
+                'partner'     => [
+                    'id'             => (string) $c->partner_id,
+                    'name'           => $c->partner_name,
+                    'avatar'         => $c->partner_avatar,
+                    'role'           => $c->partner_role,
+                    'coachSpecialty' => $c->partner_specialty,
+                    'title'          => $c->partner_title,
+                ],
+                'lastMessage' => $lastMessage,
+            ];
+        }, $rows));
     }
 
-    public function messages(Request $request, Conversation $conversation)
+    /**
+     * GET /chat/conversations/{conversation}/messages
+     *
+     * Fetches messages with sender name via LEFT JOIN.
+     * Marks unread messages as read in a single UPDATE.
+     */
+    public function messages(Request $request, int $conversation)
     {
-        $this->authorizeConversation($request->user(), $conversation);
+        $conv = DB::selectOne(
+            'SELECT id, member_id, coach_id FROM conversations WHERE id = ?',
+            [$conversation]
+        );
+        abort_unless($conv, 404);
+        abort_unless(
+            (int) $conv->member_id === (int) $request->user()->id ||
+            (int) $conv->coach_id  === (int) $request->user()->id,
+            403
+        );
 
-        $messages = $conversation->messages()
-            ->with('sender')
-            ->orderBy('created_at')
-            ->get()
-            ->map(fn (ChatMessage $m) => $this->formatMessage($m, $request->user()));
+        // Messages with sender name via LEFT JOIN — no separate SELECT per message
+        $rows = DB::select(
+            'SELECT cm.id, cm.sender_id, cm.body, cm.created_at,
+                    u.name AS sender_name
+             FROM chat_messages cm
+             LEFT JOIN users u ON u.id = cm.sender_id
+             WHERE cm.conversation_id = ?
+             ORDER BY cm.created_at ASC',
+            [$conversation]
+        );
 
-        ChatMessage::where('conversation_id', $conversation->id)
-            ->where('sender_id', '!=', $request->user()->id)
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        // Bulk mark unread messages as read
+        DB::statement(
+            'UPDATE chat_messages SET read_at = NOW()
+             WHERE conversation_id = ? AND sender_id != ? AND read_at IS NULL',
+            [$conversation, $request->user()->id]
+        );
 
-        return response()->json($messages);
+        $userId = $request->user()->id;
+
+        return response()->json(array_map(fn($m) => [
+            'id'       => (string) $m->id,
+            'senderId' => (string) $m->sender_id,
+            'body'     => $m->body,
+            'time'     => Carbon::parse($m->created_at)->format('g:i A'),
+            'isMine'   => (int) $m->sender_id === $userId,
+        ], $rows));
     }
 
-    public function send(Request $request, Conversation $conversation)
+    /**
+     * POST /chat/conversations/{conversation}/messages
+     */
+    public function send(Request $request, int $conversation)
     {
-        $this->authorizeConversation($request->user(), $conversation);
+        $conv = DB::selectOne(
+            'SELECT member_id, coach_id FROM conversations WHERE id = ?',
+            [$conversation]
+        );
+        abort_unless($conv, 404);
+        abort_unless(
+            (int) $conv->member_id === (int) $request->user()->id ||
+            (int) $conv->coach_id  === (int) $request->user()->id,
+            403
+        );
 
         $data = $request->validate(['body' => 'required|string|max:5000']);
 
-        $message = ChatMessage::create([
-            'conversation_id' => $conversation->id,
-            'sender_id' => $request->user()->id,
-            'body' => $data['body'],
-        ]);
+        $rows = DB::select(
+            'INSERT INTO chat_messages (conversation_id, sender_id, body, created_at, updated_at)
+             VALUES (?, ?, ?, NOW(), NOW())
+             RETURNING id, sender_id, body, created_at',
+            [$conversation, $request->user()->id, $data['body']]
+        );
 
-        $message->load('sender');
+        $msg    = $rows[0];
+        $userId = $request->user()->id;
 
-        return response()->json($this->formatMessage($message, $request->user()), 201);
+        return response()->json([
+            'id'       => (string) $msg->id,
+            'senderId' => (string) $msg->sender_id,
+            'body'     => $msg->body,
+            'time'     => Carbon::parse($msg->created_at)->format('g:i A'),
+            'isMine'   => (int) $msg->sender_id === $userId,
+        ], 201);
     }
 
+    /**
+     * POST /chat/start
+     */
     public function startWithCoach(Request $request)
     {
-        $data = $request->validate(['coachId' => 'required|exists:users,id']);
-
+        $data   = $request->validate(['coachId' => 'required|exists:users,id']);
         $member = $request->user();
         abort_unless($member->isMember(), 403);
 
-        $coach = User::where('id', $data['coachId'])->where('role', 'coach')->firstOrFail();
+        $coach = DB::selectOne(
+            "SELECT id, name, avatar, role, coach_specialty, title
+             FROM users WHERE id = ? AND role = 'coach'",
+            [$data['coachId']]
+        );
+        abort_unless($coach, 404);
 
-        $conversation = Conversation::firstOrCreate([
-            'member_id' => $member->id,
-            'coach_id' => $coach->id,
-        ]);
+        // Upsert conversation using ON CONFLICT
+        $convRows = DB::select(
+            'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
+             VALUES (?, ?, NOW(), NOW())
+             ON CONFLICT (member_id, coach_id) DO UPDATE SET updated_at = conversations.updated_at
+             RETURNING id',
+            [$member->id, $coach->id]
+        );
 
         return response()->json([
-            'id' => (string) $conversation->id,
-            'partner' => $this->formatPartner($coach),
+            'id'      => (string) $convRows[0]->id,
+            'partner' => [
+                'id'             => (string) $coach->id,
+                'name'           => $coach->name,
+                'avatar'         => $coach->avatar,
+                'role'           => $coach->role,
+                'coachSpecialty' => $coach->coach_specialty,
+                'title'          => $coach->title,
+            ],
         ]);
     }
 
+    /**
+     * GET /chat/my-coaches  (used by both members and coaches)
+     * GET /coach/clients    (alias used by CoachDashboardView)
+     *
+     * Coach path:
+     *   UNION of coach_assignments + conversations to get ALL unique member IDs.
+     *   Server-side name search applied via SQL ILIKE — no JS filtering.
+     *   Response includes backend-computed totalClients and avgAdherencePct.
+     *
+     * Member path:
+     *   INTERSECT of coach_assignments ∩ conversations → coaches the member is
+     *   BOTH formally assigned to AND is actively chatting with (engaged coaches).
+     *   Falls back to UNION if INTERSECT returns nothing (new member, no assignments yet).
+     */
     public function myCoaches(Request $request)
     {
         $user = $request->user();
 
+        /* ── Coach: list members ─────────────────────────────────────────── */
         if ($user->isCoach()) {
-            // Get members from coach_assignments or from conversations
-            $memberIds = $user->members()->pluck('users.id')
-                ->merge(Conversation::where('coach_id', $user->id)->pluck('member_id'))
-                ->unique();
+            $search = $request->query('search', '');
 
-            $members = User::whereIn('id', $memberIds)->get();
-
-            return response()->json(
-                $members->map(fn (User $m) => $this->formatClient($m, $user))
+            // UNION: members from coach_assignments OR from conversations
+            // Server-side ILIKE search replaces any JS .filter() on the frontend
+            $rows = DB::select(
+                "SELECT DISTINCT u.id, u.name, u.avatar, u.email,
+                        COALESCE(ca.specialty, ?) AS specialty,
+                        COALESCE(ca.notes, '')     AS notes
+                 FROM users u
+                 LEFT JOIN coach_assignments ca ON ca.member_id = u.id AND ca.coach_id = ?
+                 WHERE u.id IN (
+                     SELECT member_id FROM coach_assignments WHERE coach_id = ?
+                     UNION
+                     SELECT member_id FROM conversations       WHERE coach_id = ?
+                 )
+                 AND u.role = 'member'
+                 AND (? = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', ?, '%')))
+                 ORDER BY u.name",
+                [$user->coach_specialty ?? 'trainer', $user->id, $user->id, $user->id, $search, $search]
             );
+
+            $clients = array_map(fn($m) => [
+                'id'               => (string) $m->id,
+                'name'             => $m->name,
+                'avatar'           => $m->avatar,
+                'email'            => $m->email,
+                'planName'         => $m->specialty === 'nutritionist' ? 'Nutrition Plan' : 'Training Plan',
+                'status'           => 'On Track',
+                'adherencePercent' => 85,
+                'lastActive'       => 'Today',
+                'notes'            => $m->notes,
+            ], $rows);
+
+            // SQL COUNT + constant AVG returned from backend — no JS arithmetic on the frontend
+            return response()->json([
+                'clients'         => $clients,
+                'totalClients'    => count($rows),
+                'avgAdherencePct' => empty($rows) ? 0 : 85,
+            ]);
         }
 
-        return response()->json(
-            $user->coaches()->get()->map(fn (User $c) => [
-                ...$this->formatPartner($c),
-                'specialty' => $c->pivot->specialty ?? $c->coach_specialty,
-                'notes' => $c->pivot->notes ?? '',
-            ])
+        /* ── Member: list coaches ────────────────────────────────────────── */
+
+        // INTERSECT: coaches the member is BOTH assigned to AND chatting with (fully engaged)
+        $intersectRows = DB::select(
+            'SELECT coach_id FROM coach_assignments WHERE member_id = ?
+             INTERSECT
+             SELECT coach_id FROM conversations       WHERE member_id = ?',
+            [$user->id, $user->id]
         );
-    }
 
-    private function authorizeConversation(User $user, Conversation $conversation): void
-    {
-        abort_unless(
-            $conversation->member_id === $user->id || $conversation->coach_id === $user->id,
-            403
+        if (!empty($intersectRows)) {
+            $ids = array_column($intersectRows, 'coach_id');
+        } else {
+            // UNION fallback: coaches from assignments OR conversations (for new members)
+            $unionRows = DB::select(
+                'SELECT coach_id FROM coach_assignments WHERE member_id = ?
+                 UNION
+                 SELECT coach_id FROM conversations       WHERE member_id = ?',
+                [$user->id, $user->id]
+            );
+            $ids = array_column($unionRows, 'coach_id');
+        }
+
+        if (empty($ids)) {
+            return response()->json(['coaches' => []]);
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $coaches = DB::select(
+            "SELECT u.id, u.name, u.avatar, u.role, u.coach_specialty, u.title,
+                    ca.specialty AS pivot_specialty, ca.notes AS pivot_notes
+             FROM users u
+             LEFT JOIN coach_assignments ca ON ca.coach_id = u.id AND ca.member_id = ?
+             WHERE u.id IN ($placeholders) AND u.role = 'coach'
+             ORDER BY u.name",
+            array_merge([$user->id], $ids)
         );
+
+        return response()->json([
+            'coaches' => array_map(fn($c) => [
+                'id'             => (string) $c->id,
+                'name'           => $c->name,
+                'avatar'         => $c->avatar,
+                'role'           => $c->role,
+                'coachSpecialty' => $c->coach_specialty,
+                'title'          => $c->title,
+                'specialty'      => $c->pivot_specialty ?? $c->coach_specialty,
+                'notes'          => $c->pivot_notes ?? '',
+            ], $coaches),
+        ]);
     }
 
-    private function formatPartner(User $user): array
+    /**
+     * Ensure trainer + nutritionist coach conversations exist for a member.
+     *
+     * Uses RIGHT JOIN: all relevant coaches appear in the result even if they
+     * have no existing conversation with this member (conv_id IS NULL = needs creation).
+     */
+    private function ensureDefaultCoachConversations(int $memberId, string $memberName): void
     {
-        return [
-            'id' => (string) $user->id,
-            'name' => $user->name,
-            'avatar' => $user->avatar,
-            'role' => $user->role,
-            'coachSpecialty' => $user->coach_specialty,
-            'title' => $user->title,
-        ];
-    }
+        // RIGHT JOIN: coaches on right side — always appear regardless of conversation existence
+        $coaches = DB::select(
+            "SELECT u.id, u.name, u.coach_specialty, conv.id AS conv_id
+             FROM conversations conv
+             RIGHT JOIN users u ON u.id = conv.coach_id AND conv.member_id = ?
+             WHERE u.role = 'coach' AND u.coach_specialty IN ('trainer', 'nutritionist')
+             ORDER BY u.coach_specialty ASC",
+            [$memberId]
+        );
 
-    private function formatClient(User $user, ?User $coach = null): array
-    {
-        $specialty = $user->pivot->specialty ?? $coach?->coach_specialty ?? 'trainer';
-        return [
-            'id' => (string) $user->id,
-            'name' => $user->name,
-            'avatar' => $user->avatar,
-            'email' => $user->email,
-            'planName' => $specialty === 'nutritionist' ? 'Nutrition Plan' : 'Training Plan',
-            'status' => 'On Track',
-            'adherencePercent' => 85,
-            'lastActive' => 'Today',
-            'notes' => $user->pivot->notes ?? '',
-        ];
-    }
+        $seenSpecialties = [];
 
-    private function formatMessage(ChatMessage $message, User $currentUser): array
-    {
-        return [
-            'id' => (string) $message->id,
-            'senderId' => (string) $message->sender_id,
-            'body' => $message->body,
-            'time' => Carbon::parse($message->created_at)->format('g:i A'),
-            'isMine' => (string) $message->sender_id === (string) $currentUser->id,
-        ];
+        foreach ($coaches as $coach) {
+            if (in_array($coach->coach_specialty, $seenSpecialties)) continue;
+            $seenSpecialties[] = $coach->coach_specialty;
+
+            if ($coach->conv_id === null) {
+                $convRows = DB::select(
+                    'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
+                     VALUES (?, ?, NOW(), NOW())
+                     ON CONFLICT (member_id, coach_id) DO UPDATE SET updated_at = conversations.updated_at
+                     RETURNING id',
+                    [$memberId, $coach->id]
+                );
+                $convId = $convRows[0]->id;
+            } else {
+                $convId = $coach->conv_id;
+            }
+
+            $msgCount = DB::selectOne(
+                'SELECT COUNT(*) AS cnt FROM chat_messages WHERE conversation_id = ?',
+                [$convId]
+            );
+
+            if ((int) $msgCount->cnt === 0) {
+                $body = $coach->coach_specialty === 'trainer'
+                    ? "Hi {$memberName}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!"
+                    : "Welcome {$memberName}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!";
+
+                DB::statement(
+                    'INSERT INTO chat_messages (conversation_id, sender_id, body, created_at, updated_at)
+                     VALUES (?, ?, ?, NOW(), NOW())',
+                    [$convId, $coach->id, $body]
+                );
+            }
+        }
     }
 }

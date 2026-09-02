@@ -388,7 +388,7 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
             style={{ background: 'rgba(232,68,90,0.1)', color: '#E8445A', border: '1px solid rgba(232,68,90,0.25)' }}
           >
             {ending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-            Period ended today
+            Mark Period as Ended
           </button>
         </div>
       </div>
@@ -531,6 +531,22 @@ interface CycleTrackerViewProps {
 export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user }) => {
   const [status,  setStatus]  = useState<CycleStatus | null>(null);
   const [periods, setPeriods] = useState<CyclePeriod[]>([]);
+  const [analytics, setAnalytics] = useState<{
+    totalPeriodsLogged: number;
+    avgPeriodDurationDays: number;
+    firstPeriodDate: string | null;
+    latestPeriodDate: string | null;
+    totalSymptomsDuringMenstruation: number;
+    topSymptoms: Array<{ symptomKey: string; occurrences: number; lastLoggedOn: string }>;
+    flowDistribution: Array<{ flow: string; count: number }>;
+  } | null>(null);
+  const [timeline, setTimeline] = useState<Array<{
+    eventDate: string;
+    eventType: string;
+    title: string;
+    phaseTag: string;
+    refId: string | null;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
@@ -542,9 +558,16 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
 
   const load = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([api.getCycleStatus(), api.getCyclePeriods()]);
+      const [s, p, a, t] = await Promise.all([
+        api.getCycleStatus(),
+        api.getCyclePeriods(),
+        api.getCycleAnalytics().catch(() => null),
+        api.getCycleTimeline().catch(() => []),
+      ]);
       setStatus(s);
       setPeriods(p);
+      if (a) setAnalytics(a);
+      if (t) setTimeline(t);
       setError(null);
     } catch (e: any) {
       setError(e.message ?? 'Failed to load cycle data');
@@ -840,6 +863,128 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
           )}
         </div>
       </div>
+
+      {/* ── SQL Aggregated Analytics & Biomarker Intelligence (COUNT, AVG, LEFT JOIN) ── */}
+      {analytics && analytics.totalPeriodsLogged > 0 && (
+        <div className="p-6 rounded-3xl hl-card space-y-5 border border-purple-200/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-purple-500/10 text-purple-600">
+                <Flower2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
+                  Hormonal Biomarker Intelligence
+                </h2>
+                <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
+                  Computed in database engine via SQL Aggregators (COUNT, AVG) & LEFT JOIN
+                </p>
+              </div>
+            </div>
+            <span className="hl-badge hl-badge-purple text-[10px]">
+              {analytics.totalPeriodsLogged} cycles analyzed
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}>
+              <p className="text-[10px] font-bold uppercase text-slate-400">Avg Period Duration</p>
+              <h4 className="text-xl font-extrabold mt-1" style={{ color: 'var(--hl-text-primary)' }}>
+                {analytics.avgPeriodDurationDays} <span className="text-xs font-normal text-slate-400">days</span>
+              </h4>
+            </div>
+
+            <div className="p-4 rounded-2xl" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}>
+              <p className="text-[10px] font-bold uppercase text-slate-400">Menstrual Symptoms (LEFT JOIN)</p>
+              <h4 className="text-xl font-extrabold mt-1" style={{ color: '#E8445A' }}>
+                {analytics.totalSymptomsDuringMenstruation} <span className="text-xs font-normal text-slate-400">logged</span>
+              </h4>
+            </div>
+
+            <div className="p-4 rounded-2xl" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}>
+              <p className="text-[10px] font-bold uppercase text-slate-400">Tracking Range</p>
+              <h4 className="text-xs font-bold mt-1.5" style={{ color: 'var(--hl-text-primary)' }}>
+                {analytics.firstPeriodDate ? `${formatDate(analytics.firstPeriodDate)} — ${formatDate(analytics.latestPeriodDate)}` : 'Active'}
+              </h4>
+            </div>
+          </div>
+
+          {/* Top Symptoms */}
+          {analytics.topSymptoms.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Most Frequent Recurring Symptoms (SQL GROUP BY + COUNT)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {analytics.topSymptoms.map((ts) => {
+                  const def = SYMPTOMS.find((s) => s.key === ts.symptomKey);
+                  return (
+                    <div
+                      key={ts.symptomKey}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                      style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}
+                    >
+                      <span>{def?.icon || '🔹'}</span>
+                      <span style={{ color: 'var(--hl-text-primary)' }}>{def?.label || ts.symptomKey}</span>
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                        {ts.occurrences}x
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Chronological Cycle Timeline (SQL UNION ALL) ── */}
+      {timeline.length > 0 && (
+        <div className="p-6 rounded-3xl hl-card space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-teal-500/10 text-teal-600">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
+                Biological Timeline Feed
+              </h2>
+              <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
+                Combined period & symptom events generated by PostgreSQL SQL UNION ALL
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {timeline.slice(0, 15).map((ev, i) => (
+              <div
+                key={`${ev.eventDate}_${ev.eventType}_${i}`}
+                className="flex items-center justify-between p-3 rounded-2xl text-xs"
+                style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-sm">
+                    {ev.eventType === 'period_start' ? '🩸' : ev.eventType === 'period_end' ? '✨' : '📝'}
+                  </span>
+                  <div>
+                    <p className="font-bold" style={{ color: 'var(--hl-text-primary)' }}>{ev.title}</p>
+                    <p className="text-[10px] text-slate-400">{formatDate(ev.eventDate)}</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                  ev.eventType === 'period_start'
+                    ? 'bg-rose-100 text-rose-700'
+                    : ev.eventType === 'period_end'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {ev.eventType.replace('_', ' ').toUpperCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

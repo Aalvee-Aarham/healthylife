@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Services\AuthService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly AuthService $authService) {}
+
     public function login(Request $request)
     {
         $request->validate([
@@ -16,20 +16,7 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
-        }
-
-        $token = $user->createToken('api')->plainTextToken;
-
-        return response()->json([
-            'user' => $this->formatUser($user),
-            'token' => $token,
-        ]);
+        return response()->json($this->authService->login($request->email, $request->password));
     }
 
     public function register(Request $request)
@@ -38,6 +25,9 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6',
+            'role' => 'nullable|string|in:member,coach',
+            'coach_specialty' => 'required_if:role,coach|nullable|string|in:nutritionist,trainer,strength_conditioning,wellness,physiotherapist',
+            'title' => 'nullable|string|max:255',
             'gender' => 'nullable|string|in:female,male,other',
             'weight_current_kg' => 'nullable|numeric',
             'weight_target_kg' => 'nullable|numeric',
@@ -50,66 +40,11 @@ class AuthController extends Controller
             'carbs_goal_g' => 'nullable|integer',
             'fats_goal_g' => 'nullable|integer',
             'water_goal_ml' => 'nullable|integer',
+            'medical_conditions' => 'nullable|string',
+            'body_type' => 'nullable|string|max:255',
         ]);
 
-        $gender = $validated['gender'] ?? 'female';
-        $defaultAvatar = $gender === 'male'
-            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400'
-            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
-
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
-            'role' => 'member',
-            'gender' => $gender,
-            'avatar' => $defaultAvatar,
-            'weight_current_kg' => $validated['weight_current_kg'] ?? null,
-            'weight_target_kg' => $validated['weight_target_kg'] ?? null,
-            'height_cm' => $validated['height_cm'] ?? null,
-            'age' => $validated['age'] ?? null,
-            'goal' => $validated['goal'] ?? 'wellness',
-            'activity_level' => $validated['activity_level'] ?? 'moderate',
-            'calories_goal' => $validated['calories_goal'] ?? ($gender === 'male' ? 2400 : 2000),
-            'protein_goal_g' => $validated['protein_goal_g'] ?? ($gender === 'male' ? 160 : 130),
-            'carbs_goal_g' => $validated['carbs_goal_g'] ?? ($gender === 'male' ? 260 : 200),
-            'fats_goal_g' => $validated['fats_goal_g'] ?? ($gender === 'male' ? 75 : 65),
-            'water_goal_ml' => $validated['water_goal_ml'] ?? ($gender === 'male' ? 3500 : 3000),
-        ]);
-
-        $token = $user->createToken('api')->plainTextToken;
-
-        // Automatically assign and start default chat conversations with Trainer and Nutritionist coaches
-        $trainer = User::where('coach_specialty', 'trainer')->first();
-        if ($trainer) {
-            $convTrainer = \App\Models\Conversation::firstOrCreate([
-                'member_id' => $user->id,
-                'coach_id' => $trainer->id,
-            ]);
-            \App\Models\ChatMessage::create([
-                'conversation_id' => $convTrainer->id,
-                'sender_id' => $trainer->id,
-                'body' => "Hi {$user->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
-            ]);
-        }
-
-        $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
-        if ($nutritionist && (!$trainer || $nutritionist->id !== $trainer->id)) {
-            $convNutri = \App\Models\Conversation::firstOrCreate([
-                'member_id' => $user->id,
-                'coach_id' => $nutritionist->id,
-            ]);
-            \App\Models\ChatMessage::create([
-                'conversation_id' => $convNutri->id,
-                'sender_id' => $nutritionist->id,
-                'body' => "Welcome {$user->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
-            ]);
-        }
-
-        return response()->json([
-            'user' => $this->formatUser($user),
-            'token' => $token,
-        ], 201);
+        return response()->json($this->authService->register($validated), 201);
     }
 
     public function firebaseAuth(Request $request)
@@ -118,7 +53,7 @@ class AuthController extends Controller
             'email' => 'required|email',
             'name' => 'nullable|string|max:255',
             'avatar' => 'nullable|string',
-            'role' => 'nullable|string|in:member,coach,admin',
+            'role' => 'nullable|string|in:member,coach',
             'gender' => 'nullable|string|in:female,male,other',
             'weight_current_kg' => 'nullable|numeric',
             'weight_target_kg' => 'nullable|numeric',
@@ -133,94 +68,12 @@ class AuthController extends Controller
             'water_goal_ml' => 'nullable|integer',
         ]);
 
-        $email = strtolower(trim($validated['email']));
-        $user = User::where('email', $email)->first();
-
-        $gender = $validated['gender'] ?? 'female';
-        $defaultAvatar = $gender === 'male'
-            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400'
-            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
-
-        if (!$user) {
-            $user = User::create([
-                'name' => $validated['name'] ?? explode('@', $email)[0],
-                'email' => $email,
-                'password' => Hash::make(\Illuminate\Support\Str::random(24)),
-                'role' => $validated['role'] ?? 'member',
-                'gender' => $gender,
-                'avatar' => $validated['avatar'] ?? $defaultAvatar,
-                'weight_current_kg' => $validated['weight_current_kg'] ?? null,
-                'weight_target_kg' => $validated['weight_target_kg'] ?? null,
-                'height_cm' => $validated['height_cm'] ?? null,
-                'age' => $validated['age'] ?? null,
-                'goal' => $validated['goal'] ?? 'wellness',
-                'activity_level' => $validated['activity_level'] ?? 'moderate',
-                'calories_goal' => $validated['calories_goal'] ?? ($gender === 'male' ? 2400 : 2000),
-                'protein_goal_g' => $validated['protein_goal_g'] ?? ($gender === 'male' ? 160 : 130),
-                'carbs_goal_g' => $validated['carbs_goal_g'] ?? ($gender === 'male' ? 260 : 200),
-                'fats_goal_g' => $validated['fats_goal_g'] ?? ($gender === 'male' ? 75 : 65),
-                'water_goal_ml' => $validated['water_goal_ml'] ?? ($gender === 'male' ? 3500 : 3000),
-            ]);
-
-            // Automatically assign default chat coaches for new member
-            $trainer = User::where('coach_specialty', 'trainer')->first();
-            if ($trainer) {
-                $convTrainer = \App\Models\Conversation::firstOrCreate([
-                    'member_id' => $user->id,
-                    'coach_id' => $trainer->id,
-                ]);
-                \App\Models\ChatMessage::create([
-                    'conversation_id' => $convTrainer->id,
-                    'sender_id' => $trainer->id,
-                    'body' => "Hi {$user->name}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!",
-                ]);
-            }
-
-            $nutritionist = User::where('coach_specialty', 'nutritionist')->first();
-            if ($nutritionist && (!$trainer || $nutritionist->id !== $trainer->id)) {
-                $convNutri = \App\Models\Conversation::firstOrCreate([
-                    'member_id' => $user->id,
-                    'coach_id' => $nutritionist->id,
-                ]);
-                \App\Models\ChatMessage::create([
-                    'conversation_id' => $convNutri->id,
-                    'sender_id' => $nutritionist->id,
-                    'body' => "Welcome {$user->name}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!",
-                ]);
-            }
-        } else {
-            // Update name, avatar or biometrics if provided
-            $updates = [];
-            if (!empty($validated['name'])) $updates['name'] = $validated['name'];
-            if (!empty($validated['avatar']) && empty($user->avatar)) $updates['avatar'] = $validated['avatar'];
-            if (isset($validated['weight_current_kg'])) $updates['weight_current_kg'] = $validated['weight_current_kg'];
-            if (isset($validated['weight_target_kg'])) $updates['weight_target_kg'] = $validated['weight_target_kg'];
-            if (isset($validated['height_cm'])) $updates['height_cm'] = $validated['height_cm'];
-            if (isset($validated['age'])) $updates['age'] = $validated['age'];
-            if (isset($validated['goal'])) $updates['goal'] = $validated['goal'];
-            if (isset($validated['activity_level'])) $updates['activity_level'] = $validated['activity_level'];
-            if (isset($validated['calories_goal'])) $updates['calories_goal'] = $validated['calories_goal'];
-            if (isset($validated['protein_goal_g'])) $updates['protein_goal_g'] = $validated['protein_goal_g'];
-            if (isset($validated['carbs_goal_g'])) $updates['carbs_goal_g'] = $validated['carbs_goal_g'];
-            if (isset($validated['fats_goal_g'])) $updates['fats_goal_g'] = $validated['fats_goal_g'];
-            if (isset($validated['water_goal_ml'])) $updates['water_goal_ml'] = $validated['water_goal_ml'];
-
-            if (!empty($updates)) {
-                $user->update($updates);
-            }
-        }
-
-        $token = $user->createToken('api')->plainTextToken;
-
-        return response()->json([
-            'user' => $this->formatUser($user),
-            'token' => $token,
-        ]);
+        return response()->json($this->authService->firebaseAuth($validated));
     }
 
     public function me(Request $request)
     {
-        return response()->json($this->formatUser($request->user()));
+        return response()->json($this->authService->formatUser($request->user()->id));
     }
 
     public function logout(Request $request)
@@ -228,30 +81,5 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out']);
-    }
-
-    private function formatUser(User $user): array
-    {
-        return [
-            'id' => (string) $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'avatar' => $user->avatar,
-            'role' => $user->role,
-            'gender' => $user->gender ?? 'female',
-            'goal' => $user->goal,
-            'activityLevel' => $user->activity_level,
-            'coachSpecialty' => $user->coach_specialty,
-            'title' => $user->title,
-            'weightCurrentKg' => $user->weight_current_kg,
-            'weightTargetKg' => $user->weight_target_kg,
-            'heightCm' => $user->height_cm,
-            'age' => $user->age,
-            'caloriesGoal' => $user->calories_goal,
-            'proteinGoalG' => $user->protein_goal_g,
-            'carbsGoalG' => $user->carbs_goal_g,
-            'fatsGoalG' => $user->fats_goal_g,
-            'waterGoalMl' => $user->water_goal_ml,
-        ];
     }
 }

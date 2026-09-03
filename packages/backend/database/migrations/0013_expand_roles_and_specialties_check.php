@@ -8,9 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Drop old check constraint and allow 'admin' role, 'strength_conditioning' coach specialty
+        // Drop old check constraint and allow member, coach roles
         DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check');
-        DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('member', 'coach', 'admin'))");
+        DB::statement("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('member', 'coach'))");
 
         DB::statement('ALTER TABLE users DROP CONSTRAINT IF EXISTS users_coach_specialty_check');
         DB::statement("ALTER TABLE users ADD CONSTRAINT users_coach_specialty_check CHECK (coach_specialty IS NULL OR coach_specialty IN ('nutritionist', 'trainer', 'strength_conditioning', 'wellness', 'physiotherapist'))");

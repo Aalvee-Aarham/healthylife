@@ -253,6 +253,19 @@
 .animate-fade-slide-up { animation: fadeSlideUp 0.4s ease-out both; }
 .animate-pulse-glow    { animation: pulseGlow 2s ease-in-out infinite; }
 
+/* Skeleton loading placeholders */
+.hl-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--hl-surface-alt) 25%,
+    var(--hl-border-light) 50%,
+    var(--hl-surface-alt) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--hl-surface-alt); }

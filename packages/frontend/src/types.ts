@@ -1,4 +1,4 @@
-export type UserRole = 'member' | 'coach' | 'admin';
+export type UserRole = 'member' | 'coach';
 
 export type CoachSpecialty = 'nutritionist' | 'trainer';
 
@@ -15,7 +15,6 @@ export type NavigationTab =
   | 'chat'
   | 'cycle'
   | 'coach-dashboard'
-  | 'admin-dashboard'
   | 'clients'
   | 'consultations'
   | 'plan-builder';
@@ -310,6 +309,125 @@ export interface SystemUser {
   status: 'active' | 'suspended' | 'pending' | string;
   joinedDate: string;
   lastActive?: string;
+}
+
+// ─── Coaches / self-assignment ─────────────────────────────────────────────
+
+export interface CoachListing {
+  id: string;
+  name: string;
+  avatar: string;
+  coachSpecialty: CoachSpecialty;
+  title?: string;
+}
+
+export interface CoachAssignment {
+  id: string;
+  coach: CoachListing;
+  specialty: CoachSpecialty;
+}
+
+// ─── Meal presets ───────────────────────────────────────────────────────────
+
+export interface MealPreset {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  category: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  image?: string;
+}
+
+// ─── AI meal / gym parsing drafts ──────────────────────────────────────────
+
+export interface MealParseResult {
+  name?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  category?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  categoryGuess?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  confidence?: number;
+  invalid?: boolean;
+}
+
+export interface GymLogParseSet {
+  reps: number;
+  weight_kg: number;
+}
+
+export interface GymLogParseExercise {
+  name: string;
+  sets: GymLogParseSet[];
+}
+
+export interface GymLogParseResult {
+  title: string | null;
+  exercises: GymLogParseExercise[];
+}
+
+// ─── Plans ──────────────────────────────────────────────────────────────────
+
+export interface PlanNutritionItem {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  category: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+}
+
+export interface PlanWorkoutItem {
+  name: string;
+  sets: number;
+  reps: number;
+  notes?: string;
+}
+
+export type PlanItem = PlanNutritionItem | PlanWorkoutItem;
+
+export interface PlanDay {
+  label: string;
+  items: PlanItem[];
+}
+
+export interface PlanContent {
+  title: string;
+  days: Record<string, PlanDay>; // keys "0".."6" = Monday..Sunday
+  notes?: string;
+}
+
+export interface PlanCompletionEntry {
+  dayOfWeek: number;
+  itemIndex: number;
+}
+
+export interface Plan {
+  id: string;
+  memberId: string;
+  createdBy: 'ai' | 'trainer' | 'nutritionist';
+  coachId: string | null;
+  type: 'nutrition' | 'workout';
+  title: string;
+  status: 'active' | 'archived';
+  weekStartDate: string;
+  content: PlanContent;
+  completions: PlanCompletionEntry[];
+  updatedAt?: string | null;
+}
+
+export interface PlanCompletionResult {
+  planId: string;
+  dayOfWeek: number;
+  itemIndex: number;
+  completed: boolean;
+  /** Meal auto-logged by checking a nutrition item (null when unchecked). */
+  loggedMealId?: string | null;
+  /** Gym log auto-created by checking a workout item (null when unchecked). */
+  loggedGymLogId?: string | null;
 }
 
 export interface AIApiLog {

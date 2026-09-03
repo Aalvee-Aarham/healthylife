@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationTab, UserProfile } from './types';
 
 import { Sidebar } from './components/Sidebar';
@@ -14,8 +14,8 @@ import { NutritionView } from './components/views/NutritionView';
 import { WorkoutsView } from './components/views/WorkoutsView';
 import { CycleTrackerView } from './components/views/CycleTrackerView';
 import { ChatView } from './components/views/ChatView';
-import { CoachView } from './components/views/CoachView';
 import { CoachDashboardView } from './components/views/CoachDashboardView';
+import { PlanView } from './components/views/PlanView';
 import { AIAssistantView } from './components/views/AIAssistantView';
 import { SignInView } from './components/views/SignInView';
 import { SignUpView } from './components/views/SignUpView';
@@ -23,13 +23,25 @@ import { SignOutView } from './components/views/SignOutView';
 
 import { useDashboard } from './hooks/useDashboard';
 import { api, getAuthToken, setAuthToken } from './services/api';
-
-import {
-  demoProfiles,
-  initialMacros,
-  mockMeals,
-} from './data/mockData';
 import { DailyMacros, MealItem } from './types';
+
+// Tabs a signed-out visitor may open. Every other tab is an authenticated route.
+const PUBLIC_TABS: NavigationTab[] = ['home', 'signin', 'signup', 'signout'];
+// Protected tabs available to every role, so they are safe to resume after sign-in.
+const RESUMABLE_TABS: NavigationTab[] = ['ai-assistant'];
+
+const defaultMacros: DailyMacros = {
+  caloriesConsumed: 0,
+  caloriesGoal: 2000,
+  proteinConsumedG: 0,
+  proteinGoalG: 120,
+  carbsConsumedG: 0,
+  carbsGoalG: 220,
+  fatsConsumedG: 0,
+  fatsGoalG: 65,
+  waterConsumedMl: 0,
+  waterGoalMl: 2500,
+};
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -39,6 +51,25 @@ export default function App() {
   const [isQuickLogOpen, setIsQuickLogOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
+  // Protected tab a guest tried to open; resumed once they authenticate.
+  const [pendingTab, setPendingTab] = useState<NavigationTab | null>(null);
+  const pendingTabRef = useRef<NavigationTab | null>(null);
+  const rememberPendingTab = (tab: NavigationTab | null) => {
+    pendingTabRef.current = tab;
+    setPendingTab(tab);
+  };
+
+  // Single entry point for tab changes: guests are sent to sign-in for protected tabs.
+  const navigate = (tab: NavigationTab) => {
+    if (!isLoggedIn && !PUBLIC_TABS.includes(tab)) {
+      rememberPendingTab(RESUMABLE_TABS.includes(tab) ? tab : null);
+      setCurrentTab('signin');
+      return;
+    }
+    if (tab !== 'signin' && tab !== 'signup') rememberPendingTab(null);
+    setCurrentTab(tab);
+  };
+
   // Auto-restore session from stored token in localStorage
   useEffect(() => {
     const token = getAuthToken();
@@ -47,7 +78,10 @@ export default function App() {
         .then((profile) => {
           setUser(profile);
           setIsLoggedIn(true);
+          const resume = pendingTabRef.current;
+          rememberPendingTab(null);
           setCurrentTab((prev) => {
+            if (resume && (prev === 'signin' || prev === 'signup')) return resume;
             if (prev === 'home' || prev === 'signin' || prev === 'signup') return 'dashboard';
             if (prev === 'cycle' && profile.gender === 'male') return 'dashboard';
             return prev;
@@ -61,6 +95,13 @@ export default function App() {
     }
   }, []);
 
+  // Backstop: never leave a signed-out visitor on a protected tab (e.g. after the session expires).
+  useEffect(() => {
+    if (!isLoggedIn && !PUBLIC_TABS.includes(currentTab)) {
+      setCurrentTab('signin');
+    }
+  }, [isLoggedIn, currentTab]);
+
   // Redirect male user if currently on cycle tab
   useEffect(() => {
     if (user?.gender === 'male' && currentTab === 'cycle') {
@@ -68,9 +109,9 @@ export default function App() {
     }
   }, [user, currentTab]);
 
-  // Local state for views that don't yet use API hooks
-  const [macros, setMacros] = useState<DailyMacros>(initialMacros);
-  const [meals, setMeals] = useState<MealItem[]>(mockMeals);
+  // Local state for guest/offline fallback
+  const [macros, setMacros] = useState<DailyMacros>(defaultMacros);
+  const [meals, setMeals] = useState<MealItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Dashboard hook (real API when logged in)
@@ -80,10 +121,14 @@ export default function App() {
   const handleLoginSuccess = (profile: UserProfile, targetTab?: NavigationTab) => {
     setUser(profile);
     setIsLoggedIn(true);
-    if (targetTab) {
+    const resume = pendingTabRef.current;
+    rememberPendingTab(null);
+    if (resume) {
+      setCurrentTab(resume);
+    } else if (targetTab) {
       setCurrentTab(targetTab);
     } else if (profile.role === 'coach') {
-      setCurrentTab('coach-dashboard');
+      setCurrentTab('chat');
     } else {
       setCurrentTab('dashboard');
     }
@@ -200,7 +245,7 @@ export default function App() {
       <div className="min-h-screen font-sans flex antialiased" style={{ background: 'var(--hl-bg)', color: 'var(--hl-text-primary)' }}>
         <Sidebar
           currentTab={currentTab}
-          onSelectTab={setCurrentTab}
+          onSelectTab={navigate}
           user={user}
           onOpenQuickLog={() => setIsQuickLogOpen(true)}
           onLogout={handleLogout}
@@ -214,7 +259,7 @@ export default function App() {
             user={user}
             onOpenQuickLog={() => setIsQuickLogOpen(true)}
             onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
-            onSelectTab={setCurrentTab}
+            onSelectTab={navigate}
           />
 
           <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
@@ -229,7 +274,7 @@ export default function App() {
                     meals={activeMeals}
                     isLoading={dashboard.isLoading}
                     error={dashboard.error}
-                    onSelectTab={setCurrentTab}
+                    onSelectTab={navigate}
                     onLogWater={handleLogWater}
                     onAddMeal={handleAddMeal}
                     isOpenExternalQuickLog={isQuickLogOpen}
@@ -267,22 +312,15 @@ export default function App() {
                 {currentTab === 'cycle' && user.gender !== 'male' && (
                   <CycleTrackerView user={user} />
                 )}
+                {currentTab === 'plan-builder' && (
+                  <PlanView user={user} onLogsChanged={dashboard.refetch} />
+                )}
               </>
             )}
 
             {/* === COACH VIEWS === */}
             {user.role === 'coach' && (
-              <>
-                {currentTab === 'coach-dashboard' && (
-                  <CoachDashboardView user={user} />
-                )}
-                {(currentTab === 'clients' || currentTab === 'consultations' || currentTab === 'plan-builder') && (
-                  <CoachView clients={[]} sessions={[]} activeTab={currentTab} />
-                )}
-                {currentTab === 'chat' && (
-                  <ChatView user={user} />
-                )}
-              </>
+              <CoachDashboardView user={user} currentTab={currentTab} onSelectTab={navigate} />
             )}
 
             {/* === SHARED VIEWS === */}
@@ -303,7 +341,7 @@ export default function App() {
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
-          onSelectTab={setCurrentTab}
+          onSelectTab={navigate}
         />
       </div>
     );
@@ -314,8 +352,8 @@ export default function App() {
     <div className="min-h-screen font-sans flex flex-col antialiased" style={{ background: 'var(--hl-bg)', color: 'var(--hl-text-primary)' }}>
       <Navbar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        user={user ?? demoProfiles.member}
+        onSelectTab={navigate}
+        user={user}
         isLoggedIn={isLoggedIn}
         onLogout={handleLogout}
       />
@@ -324,49 +362,34 @@ export default function App() {
         {currentTab === 'signin' && (
           <SignInView
             onLoginSuccess={handleLoginSuccess}
-            onSelectTab={setCurrentTab}
+            onSelectTab={navigate}
+            notice={pendingTab === 'ai-assistant' ? 'Sign in to use the AI Health Advisor.' : null}
           />
         )}
 
         {currentTab === 'signup' && (
           <SignUpView
             onLoginSuccess={handleLoginSuccess}
-            onSelectTab={setCurrentTab}
+            onSelectTab={navigate}
           />
         )}
 
         {currentTab === 'signout' && (
           <SignOutView
-            onSelectTab={setCurrentTab}
+            onSelectTab={navigate}
           />
         )}
 
         {currentTab === 'home' && (
           <LandingView
-            onSelectTab={setCurrentTab}
+            onSelectTab={navigate}
             onOpenAuthModal={() => setCurrentTab('signin')}
           />
         )}
 
-        {currentTab === 'ai-assistant' && (
-          <div className="space-y-4">
-            {!isLoggedIn && (
-              <div className="bg-[#cce6d0] border border-[#0f5238]/20 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#0f5238] font-bold">
-                <span>💡 Exploring as a Guest. Sign up as a member to save plans and log meals.</span>
-                <button
-                  onClick={() => setCurrentTab('signup')}
-                  className="px-4 py-2 rounded-xl bg-[#0f5238] text-white hover:bg-[#0c432d] shadow-sm transition-colors shrink-0"
-                >
-                  Create Member Account
-                </button>
-              </div>
-            )}
-            <AIAssistantView userRole="member" userName="Guest Visitor" />
-          </div>
-        )}
       </main>
 
-      <Footer onSelectTab={setCurrentTab} />
+      <Footer onSelectTab={navigate} />
 
       <QuickLogModal
         isOpen={isQuickLogOpen}
@@ -379,7 +402,7 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
-        onSelectTab={setCurrentTab}
+        onSelectTab={navigate}
       />
     </div>
   );

@@ -60,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
         { id: 'nutrition', label: 'Nutrition & Macros', icon: UtensilsCrossed, color: 'var(--hl-teal)', bgLight: 'var(--hl-teal-light)', borderLight: 'var(--hl-teal-border)' },
         { id: 'workouts', label: 'Gym & Workouts', icon: Dumbbell, color: 'var(--hl-peach)', bgLight: 'var(--hl-peach-light)', borderLight: 'var(--hl-peach-border)' },
+        { id: 'plan-builder', label: 'My Plans', icon: FileText, color: 'var(--hl-lavender)', bgLight: 'var(--hl-lavender-light)', borderLight: 'var(--hl-lavender-border)' },
       ],
     },
     {
@@ -86,19 +87,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const coachGroups: NavGroup[] = [
     {
-      title: 'COACHING MANAGEMENT',
+      title: 'COACHING',
       items: [
-        { id: 'coach-dashboard', label: 'Coach Portal', icon: Briefcase, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
-        { id: 'clients', label: 'Client Roster', icon: Users, color: 'var(--hl-teal)', bgLight: 'var(--hl-teal-light)', borderLight: 'var(--hl-teal-border)' },
-        { id: 'consultations', label: 'Live Consultations', icon: Video, color: 'var(--hl-peach)', bgLight: 'var(--hl-peach-light)', borderLight: 'var(--hl-peach-border)' },
-      ],
-    },
-    {
-      title: 'COMMUNICATION & AI',
-      items: [
-        { id: 'chat', label: 'Client Messaging', icon: MessageSquare, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
-        { id: 'plan-builder', label: 'AI Plan Builder', icon: FileText, color: 'var(--hl-amber)', bgLight: 'var(--hl-amber-light)', borderLight: 'var(--hl-amber-border)' },
-        { id: 'ai-assistant', label: 'AI Health Advisor', icon: Zap, color: 'var(--hl-amber)', bgLight: 'var(--hl-amber-light)', borderLight: 'var(--hl-amber-border)' },
+        { id: 'clients', label: 'My Clients', icon: Users, color: 'var(--hl-teal)', bgLight: 'var(--hl-teal-light)', borderLight: 'var(--hl-teal-border)' },
+        { id: 'chat', label: 'Client Chat', icon: MessageSquare, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
+        { id: 'consultations', label: 'Plan Builder', icon: FileText, color: 'var(--hl-lavender)', bgLight: 'var(--hl-lavender-light)', borderLight: 'var(--hl-lavender-border)' },
       ],
     },
   ];

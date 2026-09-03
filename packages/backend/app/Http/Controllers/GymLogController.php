@@ -2,23 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\GymLog;
-use App\Models\GymLogSet;
+use App\Services\GymLogService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class GymLogController extends Controller
 {
+    public function __construct(private readonly GymLogService $gymLogService) {}
+
     public function index(Request $request)
     {
-        $logs = GymLog::where('user_id', $request->user()->id)
-            ->with('sets')
-            ->orderByDesc('logged_at')
-            ->limit(30)
-            ->get()
-            ->map(fn (GymLog $log) => $this->format($log));
+        return response()->json($this->gymLogService->index($request->user()->id));
+    }
 
-        return response()->json($logs);
+    public function stats(Request $request)
+    {
+        return response()->json($this->gymLogService->stats($request->user()->id));
     }
 
     public function store(Request $request)
@@ -37,67 +35,28 @@ class GymLogController extends Controller
             'sets.*.completed' => 'boolean',
         ]);
 
-        $loggedAt = !empty($data['loggedAt']) ? Carbon::parse($data['loggedAt']) : now();
-
-        $log = GymLog::create([
-            'user_id' => $request->user()->id,
-            'title' => $data['title'],
-            'duration_minutes' => $data['durationMinutes'] ?? null,
-            'calories_burned' => $data['caloriesBurned'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'logged_at' => $loggedAt,
-        ]);
-
-        foreach ($data['sets'] ?? [] as $set) {
-            GymLogSet::create([
-                'gym_log_id' => $log->id,
-                'exercise_name' => $set['exerciseName'],
-                'set_number' => $set['setNumber'],
-                'reps' => $set['reps'],
-                'weight_kg' => $set['weightKg'],
-                'completed' => $set['completed'] ?? true,
-            ]);
-        }
-
-        return response()->json($this->format($log->load('sets')), 201);
+        return response()->json($this->gymLogService->store($request->user()->id, $data), 201);
     }
 
-    public function destroy(Request $request, GymLog $gymLog)
+    public function destroy(Request $request, int $gymLog)
     {
-        abort_unless($gymLog->user_id === $request->user()->id, 403);
-        $gymLog->delete();
+        $this->gymLogService->destroy($request->user()->id, $gymLog);
 
         return response()->json(['success' => true]);
     }
 
-    public function toggleSet(Request $request, GymLog $gymLog, GymLogSet $set)
+    public function toggleSet(Request $request, int $gymLog, int $set)
     {
-        abort_unless($gymLog->user_id === $request->user()->id, 403);
-        abort_unless($set->gym_log_id === $gymLog->id, 404);
-
-        $set->update(['completed' => !$set->completed]);
-
-        return response()->json($this->format($gymLog->fresh('sets')));
+        return response()->json($this->gymLogService->toggleSet($request->user()->id, $gymLog, $set));
     }
 
-    private function format(GymLog $log): array
+    /**
+     * POST /gym-logs/parse — natural language -> structured draft (not saved).
+     */
+    public function parse(Request $request)
     {
-        return [
-            'id' => (string) $log->id,
-            'title' => $log->title,
-            'durationMinutes' => $log->duration_minutes,
-            'caloriesBurned' => $log->calories_burned,
-            'notes' => $log->notes,
-            'loggedAt' => $log->logged_at->toIso8601String(),
-            'date' => Carbon::parse($log->logged_at)->format('M j, Y'),
-            'sets' => $log->sets->map(fn (GymLogSet $s) => [
-                'id' => (string) $s->id,
-                'exerciseName' => $s->exercise_name,
-                'setNumber' => $s->set_number,
-                'reps' => $s->reps,
-                'weightKg' => (float) $s->weight_kg,
-                'completed' => $s->completed,
-            ]),
-        ];
+        $data = $request->validate(['text' => 'required|string|max:1000']);
+
+        return response()->json($this->gymLogService->parse($data['text']));
     }
 }

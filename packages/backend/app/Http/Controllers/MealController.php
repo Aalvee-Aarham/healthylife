@@ -19,17 +19,20 @@ class MealController extends Controller
         $date     = $request->query('date', now()->toDateString());
         $category = $request->query('category'); // optional SQL-level category filter
 
-        $sql      = 'SELECT id, name, calories, protein, carbs, fat, category, image, completed, logged_at
-                     FROM meals
-                     WHERE user_id = ? AND DATE(logged_at) = ?';
+        $sql      = 'SELECT 
+                        m.id, m.name, m.calories, m.protein, m.carbs, m.fat, m.category, m.image, m.completed, m.logged_at,
+                        u.name AS user_name, u.calories_goal, u.protein_goal_g, u.carbs_goal_g, u.fats_goal_g
+                     FROM meals m
+                     JOIN users u ON u.id = m.user_id
+                     WHERE m.user_id = ? AND DATE(m.logged_at) = ?';
         $bindings = [$request->user()->id, $date];
 
         if ($category) {
-            $sql     .= ' AND category = ?';
+            $sql     .= ' AND m.category = ?';
             $bindings[] = $category;
         }
 
-        $sql .= ' ORDER BY logged_at ASC';
+        $sql .= ' ORDER BY m.logged_at ASC';
 
         $rows = DB::select($sql, $bindings);
 
@@ -170,7 +173,7 @@ class MealController extends Controller
     {
         // PostgreSQL returns booleans as 't'/'f' via PDO
         $completed = in_array($meal->completed, [true, 't', 1, '1'], true);
-        return [
+        $data = [
             'id'        => (string) $meal->id,
             'name'      => $meal->name,
             'calories'  => (int) $meal->calories,
@@ -183,5 +186,19 @@ class MealController extends Controller
             'completed' => $completed,
             'loggedAt'  => Carbon::parse($meal->logged_at)->toISOString(),
         ];
+
+        if (isset($meal->user_name)) {
+            $data['userName'] = $meal->user_name;
+        }
+        if (isset($meal->calories_goal)) {
+            $data['userGoals'] = [
+                'calories' => (int) $meal->calories_goal,
+                'protein'  => (int) $meal->protein_goal_g,
+                'carbs'    => (int) $meal->carbs_goal_g,
+                'fats'     => (int) $meal->fats_goal_g,
+            ];
+        }
+
+        return $data;
     }
 }

@@ -2,23 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Meal;
+use App\Services\AI\AIService;
+use App\Services\MealService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class MealController extends Controller
 {
+    public function __construct(
+        private readonly MealService $mealService,
+        private readonly AIService $aiService,
+    ) {}
+
     public function index(Request $request)
     {
         $date = $request->query('date', now()->toDateString());
+        $category = $request->query('category');
 
-        $meals = Meal::where('user_id', $request->user()->id)
-            ->whereDate('logged_at', $date)
-            ->orderBy('logged_at')
-            ->get()
-            ->map(fn(Meal $m) => $this->format($m));
+        return response()->json($this->mealService->index($request->user()->id, $date, $category));
+    }
 
-        return response()->json($meals);
+    public function byCategory(Request $request)
+    {
+        $date = $request->query('date', now()->toDateString());
+
+        return response()->json($this->mealService->byCategory($request->user()->id, $date));
     }
 
     public function store(Request $request)
@@ -32,75 +39,61 @@ class MealController extends Controller
             'category' => 'required|string|in:breakfast,lunch,dinner,snack',
             'image' => 'nullable|url',
             'logged_at' => 'nullable|date',
+            'source' => 'nullable|string|in:manual,ai_text,ai_scan',
+            'ai_confidence' => 'nullable|numeric|between:0,1',
         ]);
 
-        $meal = Meal::create([
-            'user_id' => $request->user()->id,
-            'name' => $validated['name'],
-            'calories' => $validated['calories'],
-            'protein' => $validated['protein'],
-            'carbs' => $validated['carbs'],
-            'fat' => $validated['fat'],
-            'category' => $validated['category'],
-            'image' => $validated['image'] ?? null,
-            'logged_at' => $validated['logged_at'] ?? now(),
-            'completed' => true,
-        ]);
-
-        return response()->json($this->format($meal), 201);
+        return response()->json($this->mealService->store($request->user()->id, $validated), 201);
     }
 
-    public function update(Request $request, Meal $meal)
+    public function update(Request $request, int $meal)
     {
-        abort_unless($meal->user_id === $request->user()->id, 403);
-
         $data = $request->validate([
-            'name'     => 'sometimes|string|max:255',
+            'name' => 'sometimes|string|max:255',
             'calories' => 'sometimes|integer|min:0',
-            'protein'  => 'sometimes|integer|min:0',
-            'carbs'    => 'sometimes|integer|min:0',
-            'fat'      => 'sometimes|integer|min:0',
+            'protein' => 'sometimes|integer|min:0',
+            'carbs' => 'sometimes|integer|min:0',
+            'fat' => 'sometimes|integer|min:0',
             'category' => 'sometimes|in:breakfast,lunch,dinner,snack',
-            'image'    => 'nullable|string',
+            'image' => 'nullable|string',
         ]);
 
-        $meal->update($data);
-
-        return response()->json($this->format($meal->fresh()));
+        return response()->json($this->mealService->update($request->user()->id, $meal, $data));
     }
 
-    public function destroy(Request $request, Meal $meal)
+    public function destroy(Request $request, int $meal)
     {
-        abort_unless($meal->user_id === $request->user()->id, 403);
-
-        $meal->delete();
+        $this->mealService->destroy($request->user()->id, $meal);
 
         return response()->json(['success' => true]);
     }
 
-    public function toggle(Request $request, Meal $meal)
+    public function toggle(Request $request, int $meal)
     {
-        abort_unless($meal->user_id === $request->user()->id, 403);
-
-        $meal->update(['completed' => !$meal->completed]);
-
-        return response()->json($this->format($meal));
+        return response()->json($this->mealService->toggle($request->user()->id, $meal));
     }
 
-    private function format(Meal $meal): array
+    /**
+     * POST /meals/parse — {text} -> structured draft (not saved).
+     */
+    public function parse(Request $request)
     {
-        return [
-            'id'        => (string) $meal->id,
-            'name'      => $meal->name,
-            'calories'  => $meal->calories,
-            'protein'   => $meal->protein,
-            'carbs'     => $meal->carbs,
-            'fat'       => $meal->fat,
-            'time'      => Carbon::parse($meal->logged_at)->format('g:i A'),
-            'category'  => $meal->category,
-            'image'     => $meal->image ?? '',
-            'completed' => $meal->completed,
-            'loggedAt'  => $meal->logged_at->toISOString(),
-        ];
+        $data = $request->validate(['text' => 'required|string|max:1000']);
+
+        return response()->json($this->aiService->parseMealText($data['text']));
+    }
+
+    /**
+     * POST /meals/scan — multipart image upload -> structured draft (not saved).
+     */
+    public function scan(Request $request)
+    {
+        $request->validate(['image' => 'required|image|max:8192']);
+
+        $file = $request->file('image');
+        $base64 = base64_encode(file_get_contents($file->getRealPath()));
+        $mimeType = $file->getMimeType() ?: 'image/jpeg';
+
+        return response()->json($this->aiService->scanFoodImage($base64, $mimeType));
     }
 }

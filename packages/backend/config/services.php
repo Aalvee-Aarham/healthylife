@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
+    'ai' => [
+        'provider' => env('AI_PROVIDER', 'groq'),
+        // Path to a cacert.pem, only needed when PHP's curl.cainfo is not set.
+        'ca_bundle' => env('AI_HTTP_CA_BUNDLE'),
+    ],
+
 ];

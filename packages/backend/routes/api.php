@@ -1,12 +1,16 @@
 <?php
 
+use App\Http\Controllers\AIController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\CoachController;
 use App\Http\Controllers\CycleController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GymLogController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\MealPlanController;
+use App\Http\Controllers\MealPresetController;
+use App\Http\Controllers\PlanController;
 use App\Http\Controllers\WaterLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,17 +30,25 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'summary']);
 
     // Meals
-    Route::get('/meals',              [MealController::class, 'index']);
-    Route::post('/meals',             [MealController::class, 'store']);
-    Route::patch('/meals/{meal}',     [MealController::class, 'update']);
-    Route::delete('/meals/{meal}',    [MealController::class, 'destroy']);
-    Route::post('/meals/{meal}/toggle', [MealController::class, 'toggle']);
+    Route::get('/meals',                 [MealController::class, 'index']);
+    Route::get('/meals/by-category',     [MealController::class, 'byCategory']); // static route BEFORE {meal}
+    Route::post('/meals/parse',          [MealController::class, 'parse']);      // static route BEFORE {meal}
+    Route::post('/meals/scan',           [MealController::class, 'scan']);       // static route BEFORE {meal}
+    Route::post('/meals',                [MealController::class, 'store']);
+    Route::patch('/meals/{meal}',        [MealController::class, 'update']);
+    Route::delete('/meals/{meal}',       [MealController::class, 'destroy']);
+    Route::post('/meals/{meal}/toggle',  [MealController::class, 'toggle']);
 
     // Meal Plans
     Route::get('/meal-plans',                    [MealPlanController::class, 'index']);
     Route::post('/meal-plans',                   [MealPlanController::class, 'store']);
     Route::patch('/meal-plans/{mealPlan}',       [MealPlanController::class, 'update']);
     Route::delete('/meal-plans/{mealPlan}',      [MealPlanController::class, 'destroy']);
+
+    // Meal Presets
+    Route::get('/meal-presets',                  [MealPresetController::class, 'index']);
+    Route::post('/meal-presets',                 [MealPresetController::class, 'store']);
+    Route::delete('/meal-presets/{mealPreset}',  [MealPresetController::class, 'destroy']);
 
     // Water Logs
     Route::get('/water-logs',              [WaterLogController::class, 'index']);
@@ -45,12 +57,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Gym Logs
     Route::get('/gym-logs',                              [GymLogController::class, 'index']);
+    Route::get('/gym-logs/stats',                        [GymLogController::class, 'stats']); // static route BEFORE {gymLog}
+    Route::post('/gym-logs/parse',                       [GymLogController::class, 'parse']); // static route BEFORE {gymLog}
     Route::post('/gym-logs',                             [GymLogController::class, 'store']);
     Route::delete('/gym-logs/{gymLog}',                  [GymLogController::class, 'destroy']);
     Route::post('/gym-logs/{gymLog}/sets/{set}/toggle',  [GymLogController::class, 'toggleSet']);
 
     // Cycle Tracker
     Route::get('/cycle/status',                [CycleController::class, 'status']);
+    Route::get('/cycle/analytics',             [CycleController::class, 'analytics']); // SQL aggregates + LEFT JOIN
+    Route::get('/cycle/timeline',              [CycleController::class, 'timeline']);  // SQL UNION ALL
     Route::get('/cycle/periods',               [CycleController::class, 'periods']);
     Route::post('/cycle/periods',              [CycleController::class, 'logPeriod']);
     Route::patch('/cycle/periods/{period}',    [CycleController::class, 'updatePeriod']);
@@ -67,4 +83,18 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Coach
     Route::get('/coach/clients', [ChatController::class, 'myCoaches']);
+
+    // Coaches directory & self-assignment
+    Route::get('/coaches',                        [CoachController::class, 'index']);
+    Route::post('/coach-assignments',              [CoachController::class, 'assign']);
+    Route::delete('/coach-assignments/{assignment}', [CoachController::class, 'destroy']);
+
+    // Plans
+    Route::get('/plans',                    [PlanController::class, 'index']);
+    Route::post('/plans',                   [PlanController::class, 'store']);
+    Route::post('/plans/generate-ai',       [PlanController::class, 'generateAi']);
+    Route::patch('/plans/{plan}/complete',  [PlanController::class, 'complete']);
+
+    // AI
+    Route::post('/ai/chat', [AIController::class, 'chat']);
 });

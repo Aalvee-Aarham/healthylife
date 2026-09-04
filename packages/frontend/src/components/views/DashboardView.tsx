@@ -6,7 +6,8 @@ import { TodaysFocusCard } from '../dashboard/TodaysFocusCard';
 import { CoachBanner } from '../dashboard/CoachBanner';
 import { QuickNavCards } from '../dashboard/QuickNavCards';
 import { FloatingQuickLog } from '../dashboard/FloatingQuickLog';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { Skeleton, SkeletonCard, SkeletonStatTile } from '../ui/Skeleton';
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -44,9 +45,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4" style={{ color: 'var(--hl-text-tertiary)' }}>
-        <Loader2 className="w-10 h-10 animate-spin" style={{ color: 'var(--hl-green)' }} />
-        <p className="text-sm font-semibold">Loading your wellness hub…</p>
+      <div className="space-y-8 pb-24">
+        {/* Welcome banner skeleton */}
+        <div className="hl-card p-6 space-y-3">
+          <Skeleton height="1.5rem" width="40%" />
+          <Skeleton height="0.75rem" width="60%" />
+        </div>
+
+        {/* Nutrition + Today's Focus skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <SkeletonCard className="lg:col-span-1" lines={4} />
+          <SkeletonCard className="lg:col-span-2" lines={4} />
+        </div>
+
+        {/* Quick nav skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonStatTile key={i} />
+          ))}
+        </div>
       </div>
     );
   }

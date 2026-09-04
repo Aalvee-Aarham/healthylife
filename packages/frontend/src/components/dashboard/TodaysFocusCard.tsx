@@ -1,6 +1,8 @@
-import React from 'react';
-import { MealItem, DailyMacros, NavigationTab } from '../../types';
-import { CheckCircle2, Utensils, Dumbbell, Droplets, ChevronRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { MealItem, DailyMacros, NavigationTab, Plan } from '../../types';
+import { CheckCircle2, Utensils, Dumbbell, Droplets, ChevronRight, Sparkles } from 'lucide-react';
+import { api } from '../../services/api';
+import { Skeleton } from '../ui/Skeleton';
 
 interface TodaysFocusCardProps {
   meals: MealItem[];
@@ -9,11 +11,55 @@ interface TodaysFocusCardProps {
   onLogWater: (amountMl: number) => void;
 }
 
+/** JS Date.getDay() is 0=Sunday..6=Saturday. Plan convention is 0=Monday..6=Sunday. */
+function todayPlanDayIndex(): number {
+  const jsDay = new Date().getDay();
+  return (jsDay + 6) % 7;
+}
+
 export const TodaysFocusCard: React.FC<TodaysFocusCardProps> = ({ meals, macros, onSelectTab, onLogWater }) => {
   const recentMeals = meals.slice(0, 2);
   const waterPct = Math.min(100, macros.waterGoalMl > 0
     ? Math.round((macros.waterConsumedMl / macros.waterGoalMl) * 100)
     : 0);
+
+  const [workoutPlan, setWorkoutPlan] = useState<Plan | null>(null);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(true);
+  const [completedItems, setCompletedItems] = useState<Set<number>>(new Set());
+
+  const todayIdx = todayPlanDayIndex();
+
+  useEffect(() => {
+    api.getPlans()
+      .then((plans) => {
+        const active = plans.find((p) => p.type === 'workout' && p.status === 'active') || null;
+        setWorkoutPlan(active);
+        const done = new Set(
+          (active?.completions || [])
+            .filter((c) => c.dayOfWeek === todayIdx)
+            .map((c) => c.itemIndex)
+        );
+        setCompletedItems(done);
+      })
+      .catch(console.error)
+      .finally(() => setIsLoadingPlan(false));
+  }, [todayIdx]);
+  const todaysWorkoutItems = workoutPlan?.content.days?.[String(todayIdx)]?.items || [];
+  const workoutDoneCount = todaysWorkoutItems.filter((_, i) => completedItems.has(i)).length;
+
+  const toggleWorkoutItem = async (itemIndex: number) => {
+    if (!workoutPlan) return;
+    setCompletedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemIndex)) next.delete(itemIndex); else next.add(itemIndex);
+      return next;
+    });
+    try {
+      await api.completePlanItem(workoutPlan.id, todayIdx, itemIndex);
+    } catch (err) {
+      console.error('Failed to persist workout completion:', err);
+    }
+  };
 
   return (
     <div
@@ -118,28 +164,70 @@ export const TodaysFocusCard: React.FC<TodaysFocusCardProps> = ({ meals, macros,
 
         {/* ─── Workout ─── */}
         <div
-          className="p-3 rounded-2xl flex items-center justify-between gap-3 transition-all"
+          className="p-3 rounded-2xl space-y-2 transition-all"
           style={{ background: 'var(--hl-peach-light)', border: '1px solid var(--hl-peach-border)' }}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--hl-peach)', boxShadow: '0 2px 8px rgba(244,149,106,0.3)' }}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'var(--hl-peach)', boxShadow: '0 2px 8px rgba(244,149,106,0.3)' }}
+              >
+                <Dumbbell className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-xs font-bold" style={{ color: 'var(--hl-text-primary)' }}>Workout Plan</p>
+                {isLoadingPlan ? (
+                  <Skeleton width="120px" height="0.6rem" />
+                ) : workoutPlan ? (
+                  <p className="text-[10px]" style={{ color: 'var(--hl-text-secondary)' }}>
+                    {todaysWorkoutItems.length > 0
+                      ? `${workoutDoneCount}/${todaysWorkoutItems.length} exercises done today`
+                      : "Rest day — no exercises today"}
+                  </p>
+                ) : (
+                  <p className="text-[10px]" style={{ color: 'var(--hl-text-secondary)' }}>No active workout plan</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => onSelectTab('plan-builder')}
+              className="px-2.5 py-1.5 rounded-full text-[10px] font-bold text-white transition-all hover:scale-105 shrink-0 flex items-center gap-1"
+              style={{ background: 'var(--hl-peach)', boxShadow: '0 2px 6px rgba(244,149,106,0.35)' }}
             >
-              <Dumbbell className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-xs font-bold" style={{ color: 'var(--hl-text-primary)' }}>Workout Plan</p>
-              <p className="text-[10px]" style={{ color: 'var(--hl-text-secondary)' }}>View today's training schedule</p>
-            </div>
+              {workoutPlan ? <>View <ChevronRight className="w-3 h-3" /></> : <><Sparkles className="w-3 h-3" /> Get a plan</>}
+            </button>
           </div>
-          <button
-            onClick={() => onSelectTab('workouts')}
-            className="px-2.5 py-1.5 rounded-full text-[10px] font-bold text-white transition-all hover:scale-105"
-            style={{ background: 'var(--hl-peach)', boxShadow: '0 2px 6px rgba(244,149,106,0.35)' }}
-          >
-            View
-          </button>
+
+          {!isLoadingPlan && workoutPlan && todaysWorkoutItems.length > 0 && (
+            <ul className="space-y-1 pt-1" style={{ borderTop: '1px solid var(--hl-peach-border)' }}>
+              {todaysWorkoutItems.slice(0, 3).map((item, i) => {
+                const done = completedItems.has(i);
+                return (
+                  <li key={i}>
+                    <button
+                      onClick={() => toggleWorkoutItem(i)}
+                      className="w-full flex items-center gap-2 text-left"
+                    >
+                      <CheckCircle2
+                        className="w-3.5 h-3.5 shrink-0"
+                        style={{ color: done ? 'var(--hl-peach)' : 'var(--hl-border)' }}
+                      />
+                      <span
+                        className="text-[11px]"
+                        style={{
+                          color: done ? 'var(--hl-text-tertiary)' : 'var(--hl-text-primary)',
+                          textDecoration: done ? 'line-through' : 'none',
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         {/* ─── Hydration ─── */}

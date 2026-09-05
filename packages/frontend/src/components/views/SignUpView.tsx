@@ -1,32 +1,23 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { UserProfile, NavigationTab } from '../../types';
+import React, { useState, useMemo, useEffect, useId } from 'react';
+import { UserProfile, NavigationTab, CoachListing, CoachSpecialty } from '../../types';
 import { api, setAuthToken } from '../../services/api';
 import { signInWithGoogle, registerWithEmail } from '../../services/firebase';
 import {
   ArrowLeft,
   ArrowRight,
-  User,
-  Mail,
-  Lock,
   Eye,
   EyeOff,
   AlertCircle,
   Check,
+  ChevronDown,
+  Sparkles,
   Flame,
-  Droplets,
-  Heart,
   Dumbbell,
-  Trophy,
+  Heart,
   Moon,
-  Sofa,
-  Footprints,
-  Zap,
-  Dumbbell as DumbbellIcon,
-  Ruler,
-  Scale,
-  CalendarDays,
-  Leaf,
-  Sparkle,
+  Trophy,
+  Plus,
+  Minus,
 } from 'lucide-react';
 
 interface SignUpViewProps {
@@ -37,275 +28,232 @@ interface SignUpViewProps {
 type GenderOption = 'female' | 'male' | 'other';
 type GoalOption = 'fat_loss' | 'muscle_gain' | 'vitality' | 'cycle_sync' | 'longevity';
 type ActivityOption = 'sedentary' | 'light' | 'moderate' | 'very_active';
+type AccountRole = 'member' | 'coach';
+type StepId = 'account' | 'body' | 'goal' | 'finish' | 'specialty';
 
-/* ------------------------------------------------------------------ *
- * Design system tokens — a "field journal" wellness aesthetic.
- * Deep botanical ink + warm parchment, gold & berry accents that
- * shift per phase so the journey visibly changes character.
- * ------------------------------------------------------------------ */
 const THEME = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700;800&display=swap');
+  .su-root { font-family: 'Inter', 'DM Sans', sans-serif; color: var(--hl-text-primary); }
+  .su-display { font-family: 'DM Sans', 'Inter', sans-serif; letter-spacing: -0.02em; }
 
-  .su-root {
-    --paper: #F6F3EC;
-    --paper-2: #FFFFFF;
-    --ink: #17261F;
-    --ink-soft: #4B5A50;
-    --line: #E4DECD;
-    --account: #2F5D50;
-    --account-soft: #E4EEE9;
-    --body: #A3572F;
-    --body-soft: #F3E4D7;
-    --goals: #8B4A63;
-    --goals-soft: #F1DEE4;
-    --review: #2F5D50;
-    --review-soft: #E4EEE9;
-    font-family: 'Inter', sans-serif;
-    color: var(--ink);
-    background: var(--paper);
-  }
-  .su-display { font-family: 'Fraunces', serif; letter-spacing: -0.01em; }
-  .su-safe-b { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  .su-safe-t { padding-top: env(safe-area-inset-top, 0px); }
+  @keyframes suInFwd  { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+  @keyframes suInBack { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+  @keyframes suFade   { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes suShake  { 0%, 100% { transform: none; } 20% { transform: translateX(-5px); } 60% { transform: translateX(4px); } }
 
-  @keyframes suIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+  .su-in-fwd  { animation: suInFwd .5s cubic-bezier(.22,1,.36,1) both; }
+  .su-in-back { animation: suInBack .5s cubic-bezier(.22,1,.36,1) both; }
+  .su-fade    { animation: suFade .7s cubic-bezier(.22,1,.36,1) both; }
+  .su-shake   { animation: suShake .38s ease both; }
+
+  .su-input {
+    background: var(--hl-surface);
+    border: 1px solid var(--hl-border);
+    color: var(--hl-text-primary);
+    transition: border-color .25s ease, box-shadow .25s ease;
   }
-  @keyframes suBlob {
-    0%, 100% { border-radius: 42% 58% 65% 35% / 45% 40% 60% 55%; }
-    50% { border-radius: 60% 40% 42% 58% / 55% 65% 35% 45%; }
-  }
-  .su-anim { animation: suIn 0.36s cubic-bezier(.2,.8,.2,1) both; }
-  .su-blob { animation: suBlob 9s ease-in-out infinite; }
+  .su-input::placeholder { color: var(--hl-text-tertiary); }
+  .su-input:hover { border-color: var(--hl-green-border); }
+  .su-input:focus { outline: none; border-color: var(--hl-green); box-shadow: 0 0 0 4px var(--hl-green-light); }
+  .su-input:disabled { opacity: .6; cursor: not-allowed; }
+  .su-input[type=number]::-webkit-inner-spin-button,
+  .su-input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .su-input[type=number] { -moz-appearance: textfield; }
+
+  .su-btn { transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease, background .3s ease, opacity .2s ease; }
+  .su-btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .su-btn:active:not(:disabled) { transform: scale(.985); }
+  .su-arrow { transition: transform .35s cubic-bezier(.22,1,.36,1); }
+  .su-btn:hover .su-arrow { transform: translateX(3px); }
+
+  .su-tile { transition: border-color .25s ease, background .25s ease, transform .35s cubic-bezier(.22,1,.36,1); }
+  .su-tile:hover { transform: translateY(-1px); }
+  .su-check { transition: transform .4s cubic-bezier(.34,1.56,.64,1), opacity .2s ease; }
+
+  .su-img { transition: opacity 1s ease, transform 1.8s cubic-bezier(.22,1,.36,1); }
+
   @media (prefers-reduced-motion: reduce) {
-    .su-anim, .su-blob { animation: none !important; }
+    .su-in-fwd, .su-in-back, .su-fade, .su-shake { animation: none !important; }
+    .su-img, .su-btn, .su-tile, .su-check { transition: none !important; }
   }
 `;
 
+const U = (id: string) => 'https://images.unsplash.com/photo-' + id + '?auto=format&fit=crop&q=80&w=1000';
+
+const IMG = {
+  account: U('1544367567-0f2fcb009e0b'),
+  body: U('1571019613454-1cb2f99b2d8b'),
+  run: U('1514489024785-d5ba8dfb2198'),
+  strength: U('1517836357463-d25dfeac3438'),
+  calm: U('1506126613408-eca07ce68773'),
+  rhythm: U('1594381898411-846e7d193883'),
+  food: U('1512621776951-a57141f2eefd'),
+  coach: U('1552674605-db6ffd4facb5'),
+};
+
+const ALL_IMAGES = Array.from(new Set(Object.values(IMG)));
+
+const GOAL_IMAGE: Record<GoalOption, string> = {
+  fat_loss: IMG.run,
+  muscle_gain: IMG.strength,
+  vitality: IMG.calm,
+  cycle_sync: IMG.rhythm,
+  longevity: IMG.run,
+};
+
+const STEP_COPY: Record<StepId, { title: string; subtitle: string; caption: string }> = {
+  account: { title: 'Create your account', subtitle: 'Start free — it takes about a minute.', caption: 'Small steps, kept daily.' },
+  body: { title: 'A little about you', subtitle: 'We use this to set your daily targets.', caption: 'Your numbers, your baseline.' },
+  goal: { title: 'What are you working toward?', subtitle: 'You can change this anytime.', caption: 'Train for what matters to you.' },
+  finish: { title: 'Your daily targets', subtitle: 'Calculated from your details.', caption: 'Fuel that fits your day.' },
+  specialty: { title: 'Your coaching profile', subtitle: 'Tell members what you specialise in.', caption: 'Guide people toward better days.' },
+};
+
+/* ------------------------------------------------------------------ */
+/* Small form primitives                                               */
 /* ------------------------------------------------------------------ */
 
-type Phase = 'account' | 'body' | 'goals' | 'review';
-const PHASE_META: Record<Phase, { label: string; var: string; softVar: string }> = {
-  account: { label: 'Account', var: 'var(--account)', softVar: 'var(--account-soft)' },
-  body: { label: 'Biometrics', var: 'var(--body)', softVar: 'var(--body-soft)' },
-  goals: { label: 'Goals', var: 'var(--goals)', softVar: 'var(--goals-soft)' },
-  review: { label: 'Your Plan', var: 'var(--review)', softVar: 'var(--review-soft)' },
-};
-
-/* Curated, freely-licensed Unsplash photography — one relevant image per
-   emotional beat of the journey (kept out of the dense data-entry screens
-   so those stay quick and uncluttered). */
-const PHOTO = {
-  food: 'https://images.unsplash.com/photo-1543362905-bddfadc3d44f?w=900&q=80&fit=crop&auto=format',
-  run: 'https://images.unsplash.com/photo-1514489024785-d5ba8dfb2198?w=900&q=80&fit=crop&auto=format',
-  strength: 'https://images.unsplash.com/photo-1544033527-b192daee1f5b?w=900&q=80&fit=crop&auto=format',
-  yoga: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=900&q=80&fit=crop&auto=format',
-  moon: 'https://images.unsplash.com/photo-1637345540120-38bb0bbb7871?w=900&q=80&fit=crop&auto=format',
-} as const;
-
-/* Reusable screen shell: illustration header + content + fixed bottom CTA */
-const Screen: React.FC<{
-  phase: Phase;
-  eyebrow: string;
-  title: string;
-  subtitle?: string;
-  icon: React.ReactNode;
-  image?: string;
-  children: React.ReactNode;
-  footer: React.ReactNode;
-  error?: string | null;
-}> = ({ phase, eyebrow, title, subtitle, icon, image, children, footer, error }) => {
-  const meta = PHASE_META[phase];
-  return (
-    <div className="su-anim flex flex-col md:flex-row md:min-h-[calc(100vh-64px)]">
-      {/* Illustration panel — top strip on mobile, sticky left rail on desktop */}
-      <div
-        className="relative overflow-hidden px-6 pt-8 pb-10 sm:pt-10 sm:pb-12 md:w-[42%] md:shrink-0 md:sticky md:top-16 md:h-[calc(100vh-64px)] md:flex md:flex-col md:justify-center md:px-14 md:py-16"
-        style={{ background: meta.softVar }}
-      >
-        {image && (
-          <>
-            <img
-              src={image}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover"
-              loading="eager"
-            />
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(180deg, ${meta.var}CC 0%, ${meta.var}66 38%, ${meta.var}E6 100%)`,
-              }}
-            />
-          </>
-        )}
-        {!image && (
-          <>
-            <div
-              className="su-blob absolute -top-10 -right-14 w-44 h-44 sm:w-56 sm:h-56 md:w-72 md:h-72 md:-right-20 md:-top-16 opacity-90"
-              style={{ background: meta.var }}
-            />
-            <div
-              className="su-blob absolute -bottom-16 -left-10 w-32 h-32 md:w-48 md:h-48 md:-bottom-20 md:-left-16 opacity-20"
-              style={{ background: meta.var, animationDelay: '2s' }}
-            />
-          </>
-        )}
-        <div className="relative z-10 md:max-w-sm">
-          <span
-            className="inline-block text-[10px] font-bold uppercase tracking-[0.18em] px-2.5 py-1 rounded-full mb-4 md:mb-6"
-            style={{ background: image ? 'rgba(255,255,255,0.92)' : 'var(--paper-2)', color: meta.var }}
-          >
-            {eyebrow}
-          </span>
-          <div
-            className="w-16 h-16 md:w-20 md:h-20 rounded-3xl flex items-center justify-center mb-5 md:mb-7 shadow-lg"
-            style={{
-              background: image ? 'rgba(255,255,255,0.95)' : meta.var,
-              color: image ? meta.var : 'var(--paper-2)',
-              backdropFilter: image ? 'blur(6px)' : undefined,
-            }}
-          >
-            {icon}
-          </div>
-          <h1
-            className="su-display text-[26px] sm:text-3xl md:text-[2.5rem] font-semibold leading-[1.15]"
-            style={{ color: image ? '#fff' : 'var(--ink)' }}
-          >
-            {title}
-          </h1>
-          {subtitle && (
-            <p
-              className="text-sm md:text-base mt-2 md:mt-4 leading-relaxed max-w-sm"
-              style={{ color: image ? 'rgba(255,255,255,0.88)' : 'var(--ink-soft)' }}
-            >
-              {subtitle}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Content panel */}
-      <div className="flex-1 flex flex-col md:justify-center md:px-14 md:py-16">
-        <div className="w-full md:max-w-lg px-6 py-6 md:px-0 md:py-0 space-y-4">
-          {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 su-anim">
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <p className="leading-relaxed font-medium">{error}</p>
-            </div>
-          )}
-          {children}
-        </div>
-
-        <div className="su-safe-b px-6 pb-6 pt-2 md:px-0 md:pb-0 md:pt-8 md:max-w-lg md:w-full">{footer}</div>
-      </div>
-    </div>
-  );
-};
-
-const PrimaryButton: React.FC<{ onClick?: () => void; disabled?: boolean; type?: 'button' | 'submit'; children: React.ReactNode; phase: Phase }> = ({
-  onClick,
-  disabled,
-  type = 'button',
-  children,
-  phase,
-}) => (
-  <button
-    type={type}
-    onClick={onClick}
-    disabled={disabled}
-    style={{ background: PHASE_META[phase].var }}
-    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-bold text-sm shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
-  >
-    {children}
-  </button>
-);
-
-const OptionCard: React.FC<{
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  sub?: string;
-  phase: Phase;
-  compact?: boolean;
-}> = ({ active, onClick, icon, title, sub, phase, compact }) => {
-  const meta = PHASE_META[phase];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full text-left rounded-2xl border-2 transition-all flex items-center gap-3 ${compact ? 'p-3' : 'p-4'
-        }`}
-      style={{
-        borderColor: active ? meta.var : 'var(--line)',
-        background: active ? meta.softVar : 'var(--paper-2)',
-      }}
-    >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: active ? meta.var : 'var(--paper)', color: active ? '#fff' : 'var(--ink-soft)' }}
-      >
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-[color:var(--ink)]">{title}</p>
-        {sub && <p className="text-xs text-[color:var(--ink-soft)] mt-0.5">{sub}</p>}
-      </div>
-      {active && (
-        <div
-          className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: meta.var }}
-        >
-          <Check className="w-3 h-3 text-white stroke-[3]" />
-        </div>
-      )}
-    </button>
-  );
-};
-
-const FieldInput: React.FC<{
-  icon: React.ReactNode;
+interface TextFieldProps {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
   placeholder?: string;
+  autoComplete?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  suffix?: string;
+  right?: React.ReactNode;
   autoFocus?: boolean;
-  rightSlot?: React.ReactNode;
-  inputMode?: any;
-}> = ({ icon, label, value, onChange, type = 'text', placeholder, autoFocus, rightSlot, inputMode }) => (
-  <div>
-    <label className="block text-xs font-bold text-[color:var(--ink-soft)] mb-1.5">{label}</label>
-    <div className="relative">
-      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[color:var(--ink-soft)]">{icon}</span>
-      <input
-        type={type}
-        value={value}
-        autoFocus={autoFocus}
-        inputMode={inputMode}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full pl-11 pr-11 py-4 rounded-2xl border-2 text-base font-medium bg-[color:var(--paper-2)] focus:outline-none transition-colors"
-        style={{ borderColor: 'var(--line)' }}
-        onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--account)')}
-        onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line)')}
-      />
-      {rightSlot && <span className="absolute right-3.5 top-1/2 -translate-y-1/2">{rightSlot}</span>}
+}
+
+const TextField: React.FC<TextFieldProps> = ({
+  label, value, onChange, type = 'text', placeholder, autoComplete, inputMode, suffix, right, autoFocus,
+}) => {
+  const id = useId();
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={type}
+          value={value}
+          autoFocus={autoFocus}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className={'su-input w-full rounded-xl px-4 py-3 text-sm font-medium' + (suffix || right ? ' pr-12' : '')}
+        />
+        {suffix && (
+          <span
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold"
+            style={{ color: 'var(--hl-text-tertiary)' }}
+          >
+            {suffix}
+          </span>
+        )}
+        {right && <span className="absolute right-2 top-1/2 -translate-y-1/2">{right}</span>}
+      </div>
     </div>
-  </div>
+  );
+};
+
+function Segmented<T extends string>({
+  label, options, value, onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  const n = options.length;
+  const idx = Math.max(0, options.findIndex((o) => o.value === value));
+  return (
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="relative grid p-1 rounded-xl"
+      style={{
+        gridTemplateColumns: 'repeat(' + n + ', minmax(0, 1fr))',
+        background: 'var(--hl-surface-alt)',
+        border: '1px solid var(--hl-border)',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute top-1 bottom-1 rounded-lg"
+        style={{
+          left: 'calc(' + idx + ' * (100% - 0.5rem) / ' + n + ' + 0.25rem)',
+          width: 'calc((100% - 0.5rem) / ' + n + ')',
+          background: 'var(--hl-surface)',
+          boxShadow: 'var(--hl-shadow-sm)',
+          transition: 'left .42s cubic-bezier(.22,1,.36,1)',
+        }}
+      />
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.value)}
+            className="relative z-[1] py-2.5 px-1 text-xs font-bold rounded-lg truncate"
+            style={{ color: active ? 'var(--hl-text-primary)' : 'var(--hl-text-tertiary)', transition: 'color .3s ease' }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const Spinner = () => (
+  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  </svg>
+);
+
+const GoogleMark = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+  </svg>
 );
 
 /* ------------------------------------------------------------------ */
 
 export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelectTab }) => {
+  // Role
+  const [role, setRole] = useState<AccountRole>('member');
+
   // Account
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+
+  // Coach-only
+  const [coachSpecialty, setCoachSpecialty] = useState<CoachSpecialty>('trainer');
+  const [coachTitle, setCoachTitle] = useState('');
+
+  // Member-only: optional health note
+  const [medicalConditions, setMedicalConditions] = useState('');
+  const [bodyType, setBodyType] = useState('');
+  const [showHealthNote, setShowHealthNote] = useState(false);
+
+  // Member-only: coach selection
+  const [availableCoaches, setAvailableCoaches] = useState<CoachListing[]>([]);
+  const [isLoadingCoaches, setIsLoadingCoaches] = useState(false);
+  const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
+  const [selectedNutritionistId, setSelectedNutritionistId] = useState<string | null>(null);
 
   // Body
   const [gender, setGender] = useState<GenderOption>('female');
@@ -317,21 +265,20 @@ export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelect
   // Goals
   const [goal, setGoal] = useState<GoalOption>('vitality');
   const [activityLevel, setActivityLevel] = useState<ActivityOption>('moderate');
-  const [avgCycleDays, setAvgCycleDays] = useState<string>('28');
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [flatIndex, setFlatIndex] = useState(0);
+  const [errorKey, setErrorKey] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
   const [dir, setDir] = useState<1 | -1>(1);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   const [isGoogleAccount, setIsGoogleAccount] = useState(false);
   const [googleAvatar, setGoogleAvatar] = useState<string | null>(null);
 
-  const handleGenderChange = (g: GenderOption) => {
-    setGender(g);
-    if (g === 'male' && goal === 'cycle_sync') setGoal('muscle_gain');
-  };
+  const steps: StepId[] = role === 'coach' ? ['account', 'specialty'] : ['account', 'body', 'goal', 'finish'];
+  const safeIndex = Math.min(stepIndex, steps.length - 1);
+  const stepId = steps[safeIndex];
+  const isLastStep = safeIndex === steps.length - 1;
 
   const calculatedMacros = useMemo(() => {
     const w = parseFloat(currentWeight) || 70;
@@ -364,80 +311,58 @@ export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelect
     };
   }, [currentWeight, heightCm, age, gender, goal, activityLevel]);
 
-  /* Dynamic list of micro-step ids — skip password if signing up with Google */
-  const stepIds = useMemo(() => {
-    const ids = ['welcome', 'name', 'email'];
-    if (!isGoogleAccount) {
-      ids.push('password');
-    }
-    ids.push('gender', 'age', 'height', 'weight', 'goal');
-    if (gender === 'female') ids.push('cycle');
-    ids.push('activity', 'review');
-    return ids;
-  }, [gender, isGoogleAccount]);
-
-  const stepId = stepIds[flatIndex];
-  const phaseOf = (id: string): Phase =>
-    ['welcome', 'name', 'email', 'password'].includes(id)
-      ? 'account'
-      : ['gender', 'age', 'height', 'weight'].includes(id)
-        ? 'body'
-        : ['goal', 'cycle', 'activity'].includes(id)
-          ? 'goals'
-          : 'review';
-
-  const phaseOrder: Phase[] = ['account', 'body', 'goals', 'review'];
-  const currentPhase = phaseOf(stepId);
-  const phaseSteps = stepIds.filter((id) => phaseOf(id) === currentPhase);
-  const phaseStepPos = phaseSteps.indexOf(stepId);
-
+  // Fetch the coach directory once the member reaches the final step.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [flatIndex]);
+    if (role !== 'member' || stepId !== 'finish') return;
+    if (availableCoaches.length > 0 || isLoadingCoaches) return;
+    setIsLoadingCoaches(true);
+    api.getCoaches()
+      .then(setAvailableCoaches)
+      .catch((e) => console.warn('Failed to load coach directory:', e))
+      .finally(() => setIsLoadingCoaches(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepId, role]);
 
-  const goNext = () => {
-    setDir(1);
-    setFlatIndex((i) => Math.min(i + 1, stepIds.length - 1));
+  const showError = (msg: string) => {
+    setError(msg);
+    setErrorKey((k) => k + 1);
   };
+
+  const go = (next: number) => {
+    setDir(next > safeIndex ? 1 : -1);
+    setError(null);
+    setStepIndex(next);
+  };
+
   const goBack = () => {
-    if (flatIndex === 0) {
+    if (safeIndex === 0) {
       onSelectTab('home');
       return;
     }
-    setDir(-1);
-    setFlatIndex((i) => Math.max(i - 1, 0));
+    go(safeIndex - 1);
   };
 
-  const validateAndAdvance = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    setError(null);
-    switch (stepId) {
-      case 'name':
-        if (!name.trim()) return setError('Please enter your full name.');
-        break;
-      case 'email':
-        if (!email.trim() || !email.includes('@')) return setError('Please enter a valid email address.');
-        break;
-      case 'password':
-        if (password.length < 6) return setError('Password must be at least 6 characters.');
-        if (password !== confirmPassword) return setError('Passwords do not match.');
-        break;
-      case 'age':
-        if (!age || parseInt(age, 10) <= 10) return setError('Please enter your age.');
-        break;
-      case 'height':
-        if (!heightCm || parseInt(heightCm, 10) <= 80) return setError('Please enter your height in cm.');
-        break;
-      case 'weight':
-        if (!currentWeight || parseFloat(currentWeight) <= 20) return setError('Please enter a realistic current weight in kg.');
-        break;
-      default:
-        break;
+  const handleGenderChange = (g: GenderOption) => {
+    setGender(g);
+    if (g === 'male' && goal === 'cycle_sync') setGoal('muscle_gain');
+    if (g !== 'male' && goal === 'longevity') setGoal('vitality');
+  };
+
+  const validate = (id: StepId): string | null => {
+    if (id === 'account') {
+      if (!name.trim()) return 'Please enter your full name.';
+      if (!email.trim() || !email.includes('@')) return 'Please enter a valid email address.';
+      if (!isGoogleAccount && password.length < 6) return 'Password must be at least 6 characters.';
     }
-    goNext();
+    if (id === 'body') {
+      if (!age || parseInt(age, 10) <= 10) return 'Please enter your age.';
+      if (!heightCm || parseInt(heightCm, 10) <= 80) return 'Please enter your height in cm.';
+      if (!currentWeight || parseFloat(currentWeight) <= 20) return 'Please enter a realistic current weight in kg.';
+    }
+    return null;
   };
 
-  const handleGooglePreFill = async () => {
+  const handleGoogle = async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -446,27 +371,54 @@ export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelect
       if (fbUser.email) setEmail(fbUser.email);
       if (fbUser.photoURL) setGoogleAvatar(fbUser.photoURL);
       setIsGoogleAccount(true);
-
-      // Advance directly into biometrics / onboarding steps
-      // Move to 'gender' step (or name step if name was empty)
-      if (fbUser.displayName) {
-        setFlatIndex(3); // skips welcome, name, email directly to gender
-      } else {
-        setFlatIndex(1); // proceed to name step
-      }
+      if (fbUser.displayName && fbUser.email) go(1);
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user') {
-        setError(err?.message || 'Google sign-up failed.');
+        showError(err?.message || 'Google sign-up failed.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const switchToEmail = () => {
+    setIsGoogleAccount(false);
+    setGoogleAvatar(null);
+    setEmail('');
+  };
+
   const handleFinalSubmit = async () => {
     setError(null);
     setIsLoading(true);
     try {
+      if (role === 'coach') {
+        const payload: Record<string, unknown> = {
+          name: name.trim() || (email.split('@')[0]),
+          email: email.trim().toLowerCase(),
+          avatar: googleAvatar || undefined,
+          role: 'coach',
+          coach_specialty: coachSpecialty,
+          title: coachTitle.trim() || undefined,
+        };
+
+        if (isGoogleAccount) {
+          const res = await api.firebaseAuth(payload);
+          setAuthToken(res.token);
+          onLoginSuccess(res.user, 'chat');
+        } else {
+          try {
+            await registerWithEmail(email.trim().toLowerCase(), password.trim(), name.trim());
+          } catch (fbErr: any) {
+            console.warn('Firebase registration notice:', fbErr?.message);
+          }
+          payload.password = password.trim();
+          const res = await api.register(payload);
+          setAuthToken(res.token);
+          onLoginSuccess(res.user, 'chat');
+        }
+        return;
+      }
+
       const payload: Record<string, unknown> = {
         name: name.trim() || (email.split('@')[0]),
         email: email.trim().toLowerCase(),
@@ -483,13 +435,18 @@ export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelect
         carbs_goal_g: calculatedMacros.carbs,
         fats_goal_g: calculatedMacros.fats,
         water_goal_ml: calculatedMacros.water,
+        medical_conditions: medicalConditions.trim() || undefined,
+        body_type: bodyType.trim() || undefined,
       };
+
+      let user: UserProfile;
+      let token: string;
 
       if (isGoogleAccount) {
         // Sync full onboarding data to Laravel MySQL database via firebase endpoint
         const res = await api.firebaseAuth(payload);
-        setAuthToken(res.token);
-        onLoginSuccess(res.user, 'dashboard');
+        user = res.user;
+        token = res.token;
       } else {
         // Register with Firebase Email/Password
         try {
@@ -500,283 +457,387 @@ export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelect
 
         payload.password = password.trim();
         const res = await api.register(payload);
-        setAuthToken(res.token);
-        onLoginSuccess(res.user, 'dashboard');
+        user = res.user;
+        token = res.token;
       }
+
+      setAuthToken(token);
+
+      // Best-effort coach self-assignment — never block a successful registration/login.
+      const picks: Array<[CoachSpecialty, string | null]> = [
+        ['trainer', selectedTrainerId],
+        ['nutritionist', selectedNutritionistId],
+      ];
+      for (const [specialty, coachId] of picks) {
+        if (!coachId) continue;
+        try {
+          await api.assignCoach(coachId, specialty);
+        } catch (e) {
+          console.warn(`Failed to assign ${specialty} coach:`, e);
+        }
+      }
+
+      onLoginSuccess(user, 'dashboard');
     } catch (err: any) {
-      setError(err?.message || 'Failed to create your account. Please try again.');
+      showError(err?.message || 'Failed to create your account. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const GOAL_PHOTO: Record<GoalOption, string> = {
-    fat_loss: PHOTO.run,
-    muscle_gain: PHOTO.strength,
-    vitality: PHOTO.yoga,
-    cycle_sync: PHOTO.moon,
-    longevity: PHOTO.yoga,
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+    const msg = validate(stepId);
+    if (msg) {
+      showError(msg);
+      return;
+    }
+    setError(null);
+    if (isLastStep) handleFinalSubmit();
+    else go(safeIndex + 1);
   };
 
-  const GOALS: { id: GoalOption; icon: React.ReactNode; title: string; sub: string; hideFor?: GenderOption }[] = [
-    { id: 'fat_loss', icon: <Flame className="w-5 h-5" />, title: 'Fat Loss & Definition', sub: 'Deficit, high protein retention' },
-    { id: 'muscle_gain', icon: <DumbbellIcon className="w-5 h-5" />, title: 'Muscle & Strength', sub: 'Progressive overload, surplus' },
-    { id: 'vitality', icon: <Heart className="w-5 h-5" />, title: 'Holistic Vitality', sub: 'Balanced macros, recovery' },
-    { id: 'cycle_sync', icon: <Moon className="w-5 h-5" />, title: 'Cycle-Synced Rhythm', sub: 'Hormonal-wave pacing' },
-    { id: 'longevity', icon: <Trophy className="w-5 h-5" />, title: 'Longevity & Conditioning', sub: 'Cardio health, clean fuel' },
+  const GOALS: { id: GoalOption; icon: React.ElementType; title: string }[] = [
+    { id: 'fat_loss', icon: Flame, title: 'Lose fat' },
+    { id: 'muscle_gain', icon: Dumbbell, title: 'Build muscle' },
+    { id: 'vitality', icon: Heart, title: 'Feel better' },
+    { id: 'cycle_sync', icon: Moon, title: 'Sync my cycle' },
+    { id: 'longevity', icon: Trophy, title: 'Longevity' },
   ];
-  const visibleGoals = GOALS.filter((g) => !(gender === 'male' && g.id === 'cycle_sync') && !(gender !== 'male' && g.id === 'longevity'));
+  const visibleGoals = GOALS.filter(
+    (g) => !(gender === 'male' && g.id === 'cycle_sync') && !(gender !== 'male' && g.id === 'longevity')
+  );
 
-  const ACTIVITIES: { id: ActivityOption; icon: React.ReactNode; label: string; sub: string }[] = [
-    { id: 'sedentary', icon: <Sofa className="w-5 h-5" />, label: 'Sedentary', sub: 'Desk job, low daily steps' },
-    { id: 'light', icon: <Footprints className="w-5 h-5" />, label: 'Light', sub: '1–2 workouts / week' },
-    { id: 'moderate', icon: <Zap className="w-5 h-5" />, label: 'Moderate', sub: '3–5 workouts / week' },
-    { id: 'very_active', icon: <DumbbellIcon className="w-5 h-5" />, label: 'Very Active', sub: '6+, heavy training' },
-  ];
+  const ACTIVITY_HINT: Record<ActivityOption, string> = {
+    sedentary: 'Desk job, few daily steps.',
+    light: '1–2 workouts a week.',
+    moderate: '3–5 workouts a week.',
+    very_active: '6+ sessions or heavy training.',
+  };
+
+  const activeImage =
+    stepId === 'account' ? IMG.account
+      : stepId === 'body' ? IMG.body
+        : stepId === 'goal' ? GOAL_IMAGE[goal]
+          : stepId === 'finish' ? IMG.food
+            : IMG.coach;
+
+  const copy = STEP_COPY[stepId];
+
+  const submitLabel = isLastStep
+    ? (role === 'coach' ? 'Create coach account' : 'Create account')
+    : 'Continue';
+
+  /* ---------------------------------------------------------------- */
 
   const renderStep = () => {
     switch (stepId) {
-      case 'welcome':
+      case 'account':
         return (
-          <Screen
-            phase="account"
-            eyebrow="Welcome"
-            title="Let's build a plan that fits your body."
-            subtitle="Nine quick questions. About two minutes. No spreadsheets — just a clear daily target."
-            icon={<Leaf className="w-7 h-7" />}
-            image={PHOTO.food}
-            error={error}
-            footer={
-              <div className="space-y-3">
-                <PrimaryButton phase="account" onClick={goNext}>
-                  Get started with email <ArrowRight className="w-4 h-4" />
-                </PrimaryButton>
+          <div className="space-y-5">
+            <Segmented
+              label="Account type"
+              value={role}
+              onChange={(r) => { setRole(r); setError(null); }}
+              options={[
+                { value: 'member', label: 'Member' },
+                { value: 'coach', label: 'Coach' },
+              ]}
+            />
 
+            {isGoogleAccount ? (
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: 'var(--hl-green-light)', border: '1px solid var(--hl-green-border)' }}
+              >
+                {googleAvatar ? (
+                  <img src={googleAvatar} alt="" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <span className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--hl-surface)' }}>
+                    <GoogleMark />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold truncate">Connected with Google</p>
+                  <p className="text-[11px] truncate" style={{ color: 'var(--hl-text-secondary)' }}>{email || 'No email on this account'}</p>
+                </div>
                 <button
                   type="button"
-                  onClick={handleGooglePreFill}
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-sm transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+                  onClick={switchToEmail}
+                  className="text-[11px] font-bold shrink-0"
+                  style={{ color: 'var(--hl-green)' }}
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  <span>Continue with Google</span>
+                  Use email
                 </button>
               </div>
-            }
-          >
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
-              {[
-                { icon: <Flame className="w-4 h-4" />, label: 'Calorie target' },
-                { icon: <Dumbbell className="w-4 h-4" />, label: 'Macro split' },
-                { icon: <Droplets className="w-4 h-4" />, label: 'Hydration goal' },
-              ].map((f, i) => (
-                <div key={i} className="p-3 rounded-2xl bg-[color:var(--paper-2)] border border-[color:var(--line)] text-center">
-                  <div className="mx-auto mb-1.5 w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'var(--account-soft)', color: 'var(--account)' }}>
-                    {f.icon}
-                  </div>
-                  <p className="text-[10px] font-bold text-[color:var(--ink-soft)] leading-tight">{f.label}</p>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleGoogle}
+                  disabled={isLoading}
+                  className="su-btn w-full flex items-center justify-center gap-2.5 py-3 rounded-xl text-sm font-semibold disabled:opacity-60"
+                  style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+                >
+                  <GoogleMark />
+                  <span>Continue with Google</span>
+                </button>
+
+                <div className="flex items-center gap-3" aria-hidden="true">
+                  <span className="h-px flex-1" style={{ background: 'var(--hl-border)' }} />
+                  <span className="text-[11px] font-semibold" style={{ color: 'var(--hl-text-tertiary)' }}>or</span>
+                  <span className="h-px flex-1" style={{ background: 'var(--hl-border)' }} />
                 </div>
-              ))}
+              </>
+            )}
+
+            <div className="space-y-4">
+              <TextField label="Full name" value={name} onChange={setName} placeholder="Alex Morgan" autoComplete="name" autoFocus />
+              {(!isGoogleAccount || !email) && (
+                <TextField label="Email" value={email} onChange={setEmail} type="email" placeholder="alex@example.com" autoComplete="email" />
+              )}
+              {!isGoogleAccount && (
+                <div className="space-y-1.5">
+                  <TextField
+                    label="Password"
+                    value={password}
+                    onChange={setPassword}
+                    type={showPw ? 'text' : 'password'}
+                    placeholder="At least 6 characters"
+                    autoComplete="new-password"
+                    right={
+                      <button
+                        type="button"
+                        onClick={() => setShowPw((s) => !s)}
+                        aria-label={showPw ? 'Hide password' : 'Show password'}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ color: 'var(--hl-text-tertiary)' }}
+                      >
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    }
+                  />
+                  <p
+                    className="flex items-center gap-1.5 text-[11px] font-medium"
+                    style={{ color: password.length >= 6 ? 'var(--hl-green)' : 'var(--hl-text-tertiary)', transition: 'color .3s ease' }}
+                  >
+                    <Check
+                      className="su-check w-3 h-3"
+                      style={{ transform: password.length >= 6 ? 'scale(1)' : 'scale(0)', opacity: password.length >= 6 ? 1 : 0 }}
+                      aria-hidden="true"
+                    />
+                    Minimum 6 characters
+                  </p>
+                </div>
+              )}
             </div>
-            <p className="text-center text-xs text-[color:var(--ink-soft)] pt-3">
-              Already a member?{' '}
-              <button onClick={() => onSelectTab('signin')} className="font-bold" style={{ color: 'var(--account)' }}>
-                Sign in
-              </button>
-            </p>
-          </Screen>
+          </div>
         );
 
-      case 'name':
+      case 'body':
         return (
-          <Screen phase="account" eyebrow="Account · 1 of 3" title="What should we call you?" icon={<User className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="account" type="submit" onClick={() => validateAndAdvance()}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <form onSubmit={validateAndAdvance}>
-              <FieldInput icon={<User className="w-4 h-4" />} label="Full name" value={name} onChange={setName} placeholder="Alex Morgan" autoFocus />
-              <button type="submit" className="hidden" />
-            </form>
-          </Screen>
-        );
-
-      case 'email':
-        return (
-          <Screen phase="account" eyebrow="Account · 2 of 3" title={`Nice to meet you, ${name.split(' ')[0] || 'there'}.`} subtitle="What's your email?" icon={<Mail className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="account" onClick={() => validateAndAdvance()}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <form onSubmit={validateAndAdvance}>
-              <FieldInput icon={<Mail className="w-4 h-4" />} label="Email address" value={email} onChange={setEmail} type="email" placeholder="alex@example.com" autoFocus />
-            </form>
-          </Screen>
-        );
-
-      case 'password':
-        return (
-          <Screen phase="account" eyebrow="Account · 3 of 3" title="Secure your account." icon={<Lock className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="account" onClick={() => validateAndAdvance()}>Create account <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <form onSubmit={validateAndAdvance} className="space-y-4">
-              <FieldInput
-                icon={<Lock className="w-4 h-4" />}
-                label="Password"
-                value={password}
-                onChange={setPassword}
-                type={showPw ? 'text' : 'password'}
-                placeholder="Min. 6 characters"
-                autoFocus
-                rightSlot={
-                  <button type="button" onClick={() => setShowPw((s) => !s)} className="text-[color:var(--ink-soft)]">
-                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                }
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>Biological sex</p>
+              <Segmented
+                label="Biological sex"
+                value={gender}
+                onChange={handleGenderChange}
+                options={[
+                  { value: 'female', label: 'Female' },
+                  { value: 'male', label: 'Male' },
+                  { value: 'other', label: 'Other' },
+                ]}
               />
-              <FieldInput icon={<Lock className="w-4 h-4" />} label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} type={showPw ? 'text' : 'password'} placeholder="Re-enter password" />
-            </form>
-          </Screen>
-        );
-
-      case 'gender':
-        return (
-          <Screen phase="body" eyebrow="Biometrics · 1 of 4" title="How do you identify biologically?" subtitle="This calibrates your metabolic formula and unlocks the right tracking features." icon={<User className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="body" onClick={goNext}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <div className="space-y-2.5">
-              <OptionCard active={gender === 'female'} onClick={() => handleGenderChange('female')} icon={<Moon className="w-5 h-5" />} title="Female" sub="Includes CycleSync™ phase tracking" phase="body" />
-              <OptionCard active={gender === 'male'} onClick={() => handleGenderChange('male')} icon={<Zap className="w-5 h-5" />} title="Male" sub="Strength & recovery focus" phase="body" />
-              <OptionCard active={gender === 'other'} onClick={() => handleGenderChange('other')} icon={<Leaf className="w-5 h-5" />} title="Other / Neutral" sub="Standard wellness tracking" phase="body" />
             </div>
-          </Screen>
-        );
-
-      case 'age':
-        return (
-          <Screen phase="body" eyebrow="Biometrics · 2 of 4" title="How old are you?" icon={<CalendarDays className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="body" onClick={() => validateAndAdvance()}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <form onSubmit={validateAndAdvance}>
-              <FieldInput icon={<CalendarDays className="w-4 h-4" />} label="Age (years)" value={age} onChange={setAge} type="number" inputMode="numeric" placeholder="28" autoFocus />
-            </form>
-          </Screen>
-        );
-
-      case 'height':
-        return (
-          <Screen phase="body" eyebrow="Biometrics · 3 of 4" title="How tall are you?" icon={<Ruler className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="body" onClick={() => validateAndAdvance()}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <form onSubmit={validateAndAdvance}>
-              <FieldInput icon={<Ruler className="w-4 h-4" />} label="Height (cm)" value={heightCm} onChange={setHeightCm} type="number" inputMode="numeric" placeholder="170" autoFocus />
-            </form>
-          </Screen>
-        );
-
-      case 'weight':
-        return (
-          <Screen phase="body" eyebrow="Biometrics · 4 of 4" title="Current & target weight." subtitle="Target is optional — leave it as your current weight if you're maintaining." icon={<Scale className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="body" onClick={() => validateAndAdvance()}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <form onSubmit={validateAndAdvance} className="grid grid-cols-2 gap-3">
-              <FieldInput icon={<Scale className="w-4 h-4" />} label="Current (kg)" value={currentWeight} onChange={setCurrentWeight} type="number" inputMode="decimal" placeholder="68" autoFocus />
-              <FieldInput icon={<Scale className="w-4 h-4" />} label="Target (kg)" value={targetWeight} onChange={setTargetWeight} type="number" inputMode="decimal" placeholder="64" />
-            </form>
-          </Screen>
+            <div className="grid grid-cols-2 gap-3">
+              <TextField label="Age" value={age} onChange={setAge} type="number" inputMode="numeric" suffix="yrs" autoFocus />
+              <TextField label="Height" value={heightCm} onChange={setHeightCm} type="number" inputMode="numeric" suffix="cm" />
+              <TextField label="Weight" value={currentWeight} onChange={setCurrentWeight} type="number" inputMode="decimal" suffix="kg" />
+              <TextField label="Target" value={targetWeight} onChange={setTargetWeight} type="number" inputMode="decimal" suffix="kg" />
+            </div>
+          </div>
         );
 
       case 'goal':
         return (
-          <Screen phase="goals" eyebrow="Goals · 1 of 2" title="What's your primary focus?" icon={<Trophy className="w-7 h-7" />} image={GOAL_PHOTO[goal] || PHOTO.strength} error={error}
-            footer={<PrimaryButton phase="goals" onClick={goNext}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <div className="space-y-2.5">
-              {visibleGoals.map((g) => (
-                <OptionCard key={g.id} active={goal === g.id} onClick={() => setGoal(g.id)} icon={g.icon} title={g.title} sub={g.sub} phase="goals" />
-              ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Primary goal">
+              {visibleGoals.map((g) => {
+                const Icon = g.icon;
+                const active = goal === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setGoal(g.id)}
+                    className="su-tile relative text-left p-4 rounded-xl"
+                    style={{
+                      background: active ? 'var(--hl-green-light)' : 'var(--hl-surface)',
+                      border: '1px solid ' + (active ? 'var(--hl-green)' : 'var(--hl-border)'),
+                    }}
+                  >
+                    <Icon
+                      className="w-5 h-5 mb-3"
+                      style={{ color: active ? 'var(--hl-green)' : 'var(--hl-text-tertiary)', transition: 'color .25s ease' }}
+                      aria-hidden="true"
+                    />
+                    <span className="block text-sm font-bold">{g.title}</span>
+                    <span
+                      className="su-check absolute top-3 right-3 w-4 h-4 rounded-full flex items-center justify-center"
+                      style={{
+                        background: 'var(--hl-green)',
+                        transform: active ? 'scale(1)' : 'scale(0)',
+                        opacity: active ? 1 : 0,
+                      }}
+                      aria-hidden="true"
+                    >
+                      <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </Screen>
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>Activity level</p>
+              <Segmented
+                label="Activity level"
+                value={activityLevel}
+                onChange={setActivityLevel}
+                options={[
+                  { value: 'sedentary', label: 'Low' },
+                  { value: 'light', label: 'Light' },
+                  { value: 'moderate', label: 'Moderate' },
+                  { value: 'very_active', label: 'High' },
+                ]}
+              />
+              <p key={activityLevel} className="su-fade text-[11px] pt-0.5" style={{ color: 'var(--hl-text-tertiary)' }}>
+                {ACTIVITY_HINT[activityLevel]}
+              </p>
+            </div>
+          </div>
         );
 
-      case 'cycle':
+      case 'finish':
         return (
-          <Screen phase="goals" eyebrow="Goals · extra" title="Average cycle length?" subtitle="Powers your CycleSync™ phase predictions. You can fine-tune this later." icon={<Moon className="w-7 h-7" />} image={PHOTO.moon} error={error}
-            footer={<PrimaryButton phase="goals" onClick={goNext}>Continue <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <div className="p-5 rounded-2xl bg-[color:var(--paper-2)] border-2 border-[color:var(--line)] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[color:var(--ink-soft)]">Cycle length</span>
-                <span className="su-display text-2xl font-semibold" style={{ color: 'var(--goals)' }}>{avgCycleDays}<span className="text-xs font-sans font-bold text-[color:var(--ink-soft)]"> days</span></span>
-              </div>
-              <input type="range" min="21" max="35" value={avgCycleDays} onChange={(e) => setAvgCycleDays(e.target.value)} className="w-full" style={{ accentColor: 'var(--goals)' }} />
-              <div className="flex justify-between text-[10px] text-[color:var(--ink-soft)] font-semibold">
-                <span>21 · Short</span><span>28 · Standard</span><span>35 · Longer</span>
-              </div>
-            </div>
-          </Screen>
-        );
-
-      case 'activity':
-        return (
-          <Screen phase="goals" eyebrow="Goals · 2 of 2" title="How active is your week?" icon={<Zap className="w-7 h-7" />} error={error}
-            footer={<PrimaryButton phase="goals" onClick={goNext}>See my plan <ArrowRight className="w-4 h-4" /></PrimaryButton>}>
-            <div className="space-y-2.5">
-              {ACTIVITIES.map((a) => (
-                <OptionCard key={a.id} active={activityLevel === a.id} onClick={() => setActivityLevel(a.id)} icon={a.icon} title={a.label} sub={a.sub} phase="goals" compact />
-              ))}
-            </div>
-          </Screen>
-        );
-
-      case 'review':
-        return (
-          <Screen phase="review" eyebrow="Ready" title="Your plan is calibrated." subtitle="Built from your exact biometrics — you can always adjust it later." icon={<Sparkle className="w-7 h-7" />} image={PHOTO.food} error={error}
-            footer={
-              <PrimaryButton phase="review" onClick={handleFinalSubmit} disabled={isLoading}>
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Launching your dashboard…
-                  </span>
-                ) : (
-                  <>Enter your dashboard <ArrowRight className="w-4 h-4" /></>
-                )}
-              </PrimaryButton>
-            }
-          >
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-6">
+            <div className="grid grid-cols-4 rounded-xl overflow-hidden" style={{ border: '1px solid var(--hl-border)' }}>
               {[
-                { label: 'Calories', value: calculatedMacros.calories, unit: 'kcal / day' },
-                { label: 'Protein', value: `${calculatedMacros.protein}g`, unit: 'lean repair' },
-                { label: 'Carbs', value: `${calculatedMacros.carbs}g`, unit: 'energy fuel' },
-                { label: 'Water', value: `${(calculatedMacros.water / 1000).toFixed(1)}L`, unit: `${calculatedMacros.water} ml` },
-              ].map((m) => (
-                <div key={m.label} className="p-4 rounded-2xl bg-[color:var(--paper-2)] border border-[color:var(--line)] text-center">
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--review)' }}>{m.label}</span>
-                  <p className="su-display text-2xl font-semibold mt-0.5">{m.value}</p>
-                  <span className="text-[10px] text-[color:var(--ink-soft)] font-semibold">{m.unit}</span>
+                { label: 'kcal', value: calculatedMacros.calories.toLocaleString('en-US') },
+                { label: 'Protein', value: calculatedMacros.protein + 'g' },
+                { label: 'Carbs', value: calculatedMacros.carbs + 'g' },
+                { label: 'Water', value: (calculatedMacros.water / 1000).toFixed(1) + 'L' },
+              ].map((m, i) => (
+                <div
+                  key={m.label}
+                  className="py-4 text-center"
+                  style={{ borderLeft: i ? '1px solid var(--hl-border)' : undefined, background: 'var(--hl-surface)' }}
+                >
+                  <p className="su-display text-base sm:text-lg font-bold tabular-nums">{m.value}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mt-0.5" style={{ color: 'var(--hl-text-tertiary)' }}>
+                    {m.label}
+                  </p>
                 </div>
               ))}
             </div>
 
-            <div className="p-4 rounded-2xl bg-[color:var(--paper-2)] border border-[color:var(--line)] space-y-2.5 mt-1">
-              <p className="text-[11px] font-extrabold text-[color:var(--ink-soft)] uppercase tracking-wider">Profile</p>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div><span className="text-[10px] text-[color:var(--ink-soft)] block">Name</span><span className="font-bold">{name}</span></div>
-                <div><span className="text-[10px] text-[color:var(--ink-soft)] block">Focus</span><span className="font-bold capitalize">{goal.replace('_', ' ')}</span></div>
-                <div><span className="text-[10px] text-[color:var(--ink-soft)] block">Weight</span><span className="font-bold">{currentWeight} → {targetWeight || currentWeight} kg</span></div>
-                <div><span className="text-[10px] text-[color:var(--ink-soft)] block">Cycle tracking</span><span className="font-bold" style={{ color: gender === 'male' ? 'var(--ink-soft)' : 'var(--review)' }}>{gender === 'male' ? 'Not applicable' : 'Enabled'}</span></div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
+                Coaches <span style={{ color: 'var(--hl-text-tertiary)' }}>· optional</span>
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {(['trainer', 'nutritionist'] as CoachSpecialty[]).map((specialty) => {
+                  const list = availableCoaches.filter((c) => c.coachSpecialty === specialty);
+                  const selectedId = specialty === 'trainer' ? selectedTrainerId : selectedNutritionistId;
+                  const setSelected = specialty === 'trainer' ? setSelectedTrainerId : setSelectedNutritionistId;
+                  const placeholder = isLoadingCoaches
+                    ? 'Loading…'
+                    : list.length
+                      ? (specialty === 'trainer' ? 'Any trainer' : 'Any nutritionist')
+                      : 'None available';
+                  return (
+                    <div key={specialty} className="relative">
+                      <label className="sr-only" htmlFor={'su-coach-' + specialty}>
+                        {specialty === 'trainer' ? 'Trainer' : 'Nutritionist'}
+                      </label>
+                      <select
+                        id={'su-coach-' + specialty}
+                        value={selectedId ?? ''}
+                        onChange={(e) => setSelected(e.target.value || null)}
+                        disabled={isLoadingCoaches || list.length === 0}
+                        className="su-input w-full appearance-none rounded-xl pl-4 pr-9 py-3 text-sm font-medium truncate"
+                      >
+                        <option value="">{placeholder}</option>
+                        {list.map((coach) => (
+                          <option key={coach.id} value={coach.id}>{coach.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
+                        style={{ color: 'var(--hl-text-tertiary)' }}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </Screen>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowHealthNote((v) => !v)}
+                aria-expanded={showHealthNote}
+                className="flex items-center gap-1.5 text-xs font-bold"
+                style={{ color: 'var(--hl-green)' }}
+              >
+                {showHealthNote ? <Minus className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                Add a health note
+              </button>
+              {showHealthNote && (
+                <div className="su-fade space-y-3">
+                  <textarea
+                    value={medicalConditions}
+                    onChange={(e) => setMedicalConditions(e.target.value)}
+                    placeholder="Injuries or conditions, e.g. knee injury, hypertension"
+                    aria-label="Medical conditions"
+                    rows={2}
+                    className="su-input w-full rounded-xl px-4 py-3 text-sm font-medium resize-none"
+                  />
+                  <TextField label="Body type" value={bodyType} onChange={setBodyType} placeholder="e.g. mesomorph" />
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'specialty':
+        return (
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>Specialty</p>
+              <Segmented
+                label="Specialty"
+                value={coachSpecialty}
+                onChange={setCoachSpecialty}
+                options={[
+                  { value: 'trainer', label: 'Trainer' },
+                  { value: 'nutritionist', label: 'Nutritionist' },
+                ]}
+              />
+            </div>
+            <TextField
+              label="Headline (optional)"
+              value={coachTitle}
+              onChange={setCoachTitle}
+              placeholder="e.g. Certified Strength Coach"
+              autoFocus
+            />
+          </div>
         );
 
       default:
@@ -785,61 +846,128 @@ export const SignUpView: React.FC<SignUpViewProps> = ({ onLoginSuccess, onSelect
   };
 
   return (
-    <div className="su-root min-h-screen">
+    <div className="su-root flex items-center justify-center py-2 sm:py-6 min-h-[calc(100vh-9rem)]">
       <style>{THEME}</style>
 
-      {/* Top bar: back + segmented phase progress + (desktop) brand + phase labels */}
-      <div className="su-safe-t sticky top-0 z-20 bg-[color:var(--paper)]/95 backdrop-blur border-b border-transparent md:border-[color:var(--line)]">
-        <div className="max-w-5xl mx-auto px-5 md:px-8 pt-4 pb-3 md:h-16 md:flex md:items-center">
-          <div className="flex items-center gap-3 md:gap-6 w-full">
+      <div
+        className="w-full max-w-5xl grid lg:grid-cols-[1fr_1.05fr] rounded-[2rem] overflow-hidden"
+        style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)', boxShadow: 'var(--hl-shadow-lg)' }}
+      >
+        {/* ------------------------------ Form ------------------------------ */}
+        <section className="flex flex-col px-6 py-7 sm:px-10 sm:py-9 lg:min-h-[640px]">
+          <div className="flex items-center justify-between">
             <button
+              type="button"
               onClick={goBack}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-[color:var(--paper-2)] border border-[color:var(--line)] shrink-0"
-              aria-label="Back"
+              aria-label={safeIndex === 0 ? 'Back to home' : 'Previous step'}
+              className="su-btn w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--hl-surface-alt)', color: 'var(--hl-text-secondary)' }}
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-
-            <span className="su-display hidden md:inline-block text-lg font-semibold shrink-0" style={{ color: 'var(--account)' }}>
-              HealthyLife
+            <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--hl-text-tertiary)' }}>
+              Step {safeIndex + 1} of {steps.length}
             </span>
-
-            <div className="flex-1 flex gap-1.5">
-              {phaseOrder.map((p) => {
-                const isPast = phaseOrder.indexOf(p) < phaseOrder.indexOf(currentPhase);
-                const isCurrent = p === currentPhase;
-                const fillPct = isCurrent ? ((phaseStepPos + 1) / phaseSteps.length) * 100 : isPast ? 100 : 0;
-                return (
-                  <div key={p} className="flex-1 flex flex-col gap-1">
-                    <div className="h-1.5 rounded-full bg-[color:var(--line)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${fillPct}%`, background: PHASE_META[p].var }}
-                      />
-                    </div>
-                    <span
-                      className="hidden md:block text-[10px] font-bold uppercase tracking-wider"
-                      style={{ color: isCurrent ? PHASE_META[p].var : 'var(--ink-soft)', opacity: isCurrent || isPast ? 1 : 0.5 }}
-                    >
-                      {PHASE_META[p].label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Mobile: phone-style single column. Desktop: full-width split layout. */}
-      <div className="md:max-w-5xl md:mx-auto">
-        <div
-          ref={scrollRef}
-          className="mx-auto max-w-md md:max-w-none bg-[color:var(--paper)] shadow-2xl md:shadow-none min-h-[calc(100vh-64px)]"
-          key={stepId}
-        >
-          {renderStep()}
-        </div>
+          <div className="flex gap-1.5 mt-5" aria-hidden="true">
+            {steps.map((s, i) => (
+              <span key={s} className="h-1 flex-1 rounded-full overflow-hidden" style={{ background: 'var(--hl-border-light)' }}>
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: i <= safeIndex ? '100%' : '0%',
+                    background: 'var(--hl-green)',
+                    transition: 'width .6s cubic-bezier(.22,1,.36,1)',
+                  }}
+                />
+              </span>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col pt-8">
+            <div key={stepId + role} className={dir === 1 ? 'su-in-fwd' : 'su-in-back'}>
+              <h1 className="su-display text-[1.75rem] sm:text-3xl font-bold leading-tight">{copy.title}</h1>
+              <p className="text-sm mt-1.5" style={{ color: 'var(--hl-text-secondary)' }}>{copy.subtitle}</p>
+              <div className="mt-7">{renderStep()}</div>
+            </div>
+
+            <div className="mt-auto pt-7 space-y-4">
+              {error && (
+                <div
+                  key={errorKey}
+                  role="alert"
+                  className="su-shake flex items-start gap-2 p-3 rounded-xl text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200"
+                >
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" aria-hidden="true" />
+                  <span className="leading-relaxed">{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="su-btn w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
+                style={{ background: 'var(--hl-green)', boxShadow: '0 8px 20px rgba(61,122,90,.25)' }}
+              >
+                {isLoading && isLastStep ? (
+                  <>
+                    <Spinner />
+                    <span>Creating account…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{submitLabel}</span>
+                    <ArrowRight className="su-arrow w-4 h-4" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+
+              {safeIndex === 0 && (
+                <p className="text-center text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
+                  Already have an account?{' '}
+                  <button type="button" onClick={() => onSelectTab('signin')} className="font-bold" style={{ color: 'var(--hl-green)' }}>
+                    Sign in
+                  </button>
+                </p>
+              )}
+            </div>
+          </form>
+        </section>
+
+        {/* ------------------------------ Image ------------------------------ */}
+        <aside className="hidden lg:block p-3" aria-hidden="true">
+          <div className="relative h-full rounded-[1.5rem] overflow-hidden" style={{ background: 'var(--hl-gradient-hero)' }}>
+            {ALL_IMAGES.map((src) => {
+              const active = src === activeImage;
+              return (
+                <img
+                  key={src}
+                  src={src}
+                  alt=""
+                  className="su-img absolute inset-0 w-full h-full object-cover"
+                  style={{ opacity: active ? 1 : 0, transform: active ? 'scale(1)' : 'scale(1.06)' }}
+                />
+              );
+            })}
+            <div
+              className="absolute inset-0"
+              style={{ background: 'linear-gradient(180deg, rgba(44,36,32,.28) 0%, rgba(44,36,32,0) 32%, rgba(44,36,32,0) 55%, rgba(44,36,32,.62) 100%)' }}
+            />
+            <div className="absolute left-6 top-6 flex items-center gap-2 text-white">
+              <span className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,.2)', backdropFilter: 'blur(8px)' }}>
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <span className="su-display text-sm font-bold">HealthyLife</span>
+            </div>
+            <p
+              key={copy.caption}
+              className="su-fade su-display absolute left-8 right-8 bottom-8 text-white text-[1.7rem] font-semibold leading-snug"
+            >
+              {copy.caption}
+            </p>
+          </div>
+        </aside>
       </div>
     </div>
   );

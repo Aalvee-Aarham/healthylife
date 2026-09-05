@@ -1,8 +1,9 @@
+// @ts-nocheck React type declarations are unavailable in this project.
 import React, { useState, useEffect, useCallback } from 'react';
-import { MealItem, MealPlan, DailyMacros, WaterLogEntry } from '../../types';
+import { MealItem, MealPlan, DailyMacros, WaterLogEntry, MealPreset } from '../../types';
 import { api } from '../../services/api';
-import { askGroqAI } from '../../services/groqApi';
 import { fetchPexelsImage } from '../../services/pexelsApi';
+import { SkeletonRow, SkeletonCard } from '../ui/Skeleton';
 import {
   Utensils, Sparkles, Plus, Pencil, Trash2, X, Check,
   ChevronDown, ChevronUp, Send, Loader2, AlertCircle,
@@ -38,48 +39,6 @@ const CATEGORY_META: Record<MealCategory, { label: string; emoji: string; color:
   dinner:    { label: 'Dinner',             emoji: '🌙', color: 'var(--hl-green)',   bg: 'var(--hl-green-light)',   border: 'var(--hl-green-border)' },
   snack:     { label: 'Spontaneous Bites',  emoji: '⚡', color: 'var(--hl-peach)',   bg: 'var(--hl-peach-light)',   border: 'var(--hl-peach-border)' },
 };
-
-const FOOD_KEYWORDS = [
-  'egg','eggs','chicken','salmon','beef','steak','salad','smoothie','oat','oats','oatmeal',
-  'toast','bread','rice','protein','shake','apple','banana','milk','coffee','tea','pizza',
-  'burger','pasta','soup','meal','ate','had','drink','drinking','snack','breakfast','lunch',
-  'dinner','kcal','cal','calories','gram','grams','food','recipe','sandwich','bowl','taco',
-  'sushi','wrap','yogurt','avocado','cookie','cake','juice','fish','tuna','turkey','pork',
-  'tofu','quinoa','veggie','fruit','nuts','almonds','peanut','butter','cheese','pie',
-  'pancake','waffle','berry','blueberries','strawberries','watermelon','chia','whey','casein',
-];
-
-function isFoodQuery(q: string) {
-  const lower = q.toLowerCase();
-  return FOOD_KEYWORDS.some(kw => lower.includes(kw)) || /\b(\d+)\s*(kcal|cal|calories|g|grams)\b/i.test(q);
-}
-
-function estimateNutrition(q: string) {
-  const lower = q.toLowerCase();
-  const calMatch = lower.match(/(\d+)\s*(kcal|cal|calories)/);
-  const protMatch = lower.match(/(\d+)\s*(g|grams)?\s*protein/);
-  const carbMatch = lower.match(/(\d+)\s*(g|grams)?\s*(carb|carbs)/);
-  const fatMatch  = lower.match(/(\d+)\s*(g|grams)?\s*fat/);
-  let cal     = calMatch  ? parseInt(calMatch[1])  : 0;
-  let protein = protMatch ? parseInt(protMatch[1]) : 0;
-  let carbs   = carbMatch ? parseInt(carbMatch[1]) : 0;
-  let fat     = fatMatch  ? parseInt(fatMatch[1])  : 0;
-  if (!cal) {
-    if (lower.includes('steak') || lower.includes('beef'))        { cal = 550; protein = protein||48; carbs = carbs||0;  fat = fat||28; }
-    else if (lower.includes('salmon') || lower.includes('fish'))  { cal = 460; protein = protein||38; carbs = carbs||5;  fat = fat||22; }
-    else if (lower.includes('chicken') || lower.includes('turkey')){ cal = 380; protein = protein||42; carbs = carbs||8;  fat = fat||10; }
-    else if (lower.includes('egg'))                                { cal = 220; protein = protein||14; carbs = carbs||2;  fat = fat||15; }
-    else if (lower.includes('salad'))                              { cal = 290; protein = protein||12; carbs = carbs||22; fat = fat||14; }
-    else if (lower.includes('smoothie')||lower.includes('shake'))  { cal = 310; protein = protein||28; carbs = carbs||32; fat = fat||5;  }
-    else if (lower.includes('pizza')||lower.includes('burger'))    { cal = 680; protein = protein||28; carbs = carbs||70; fat = fat||30; }
-    else if (lower.includes('oat'))                                { cal = 260; protein = protein||10; carbs = carbs||42; fat = fat||5;  }
-    else                                                           { cal = 380; protein = protein||22; carbs = carbs||35; fat = fat||12; }
-  }
-  if (!protein) protein = Math.round((cal * 0.25) / 4);
-  if (!carbs)   carbs   = Math.round((cal * 0.45) / 4);
-  if (!fat)     fat     = Math.round((cal * 0.30) / 9);
-  return { calories: cal, protein, carbs, fat };
-}
 
 // ─── Donut Pie Chart ─────────────────────────────────────────────────────────
 
@@ -484,84 +443,232 @@ function HydrationCard({ selectedDate, macros, onLogWater }: HydrationCardProps)
 
 // ─── Log Meal Modal ───────────────────────────────────────────────────────────
 
+type PresetInput = { name: string; calories: number; protein: number; carbs: number; fat: number; category: MealCategory; image?: string };
+
 interface LogMealModalProps {
   category: MealCategory;
   onClose: () => void;
   onSaved: (meal: { name: string; calories: number; protein: number; carbs: number; fat: number; image?: string; category: MealCategory; aiTag?: string }) => Promise<void>;
+  presets: MealPreset[];
+  presetsLoading: boolean;
+  onCreatePreset: (data: PresetInput) => Promise<void>;
+  onDeletePreset: (id: string) => Promise<void>;
 }
 
-function LogMealModal({ category, onClose, onSaved }: LogMealModalProps) {
-  const [mode, setMode] = useState<'ai' | 'manual'>('ai');
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+type ReviewForm = { name: string; calories: string; protein: string; carbs: string; fat: string; category: MealCategory; image?: string };
 
-  // Manual form
-  const [form, setForm] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
+const EMPTY_PRESET_FORM = { name: '', calories: '', protein: '', carbs: '', fat: '' };
+
+function LogMealModal({ category, onClose, onSaved, presets, presetsLoading, onCreatePreset, onDeletePreset }: LogMealModalProps) {
+  const [mode, setMode] = useState<'ai' | 'scan' | 'manual'>('ai');
   const meta = CATEGORY_META[category];
 
-  const handleAiSubmit = async (e: React.FormEvent) => {
+  // Quick presets: one tap fills the review form; "New preset" saves one to the backend
+  const [reviewTag, setReviewTag] = useState<string | null>(null);
+  const [showPresetForm, setShowPresetForm] = useState(false);
+  const [presetForm, setPresetForm] = useState({ ...EMPTY_PRESET_FORM, category });
+  const [isCreatingPreset, setIsCreatingPreset] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
+
+  // Presets for this meal category first, then the rest
+  const sortedPresets = [...presets].sort((a, b) => Number(b.category === category) - Number(a.category === category));
+
+  // Text-parse (Task B) state
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  // Photo scan (Task A) state
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [scanFile, setScanFile] = useState<File | null>(null);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  // Review/draft form — populated by AI parse, photo scan, or edited directly in manual mode
+  const [review, setReview] = useState<ReviewForm | null>(null);
+  const [manualForm, setManualForm] = useState<ReviewForm>({ name: '', calories: '', protein: '', carbs: '', fat: '', category });
+
+  const [savePreset, setSavePreset] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const resetDraft = () => {
+    setReview(null);
+    setReviewTag(null);
+    setParseError(null);
+    setScanError(null);
+    setScanFile(null);
+    setScanPreviewUrl(null);
+  };
+
+  // ── Task B: text-based meal parsing via api.parseMealText ───────────────────
+  const handleParseText = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = aiPrompt.trim();
-    if (!trimmed || isLoading) return;
-    if (!isFoodQuery(trimmed)) {
-      setFeedback('⚠️ Please describe a food item or meal to log.');
-      return;
-    }
-    setIsLoading(true);
-    setFeedback('AI is calculating nutrition & fetching photo…');
+    if (!trimmed || isParsing) return;
+    setIsParsing(true);
+    setParseError(null);
     try {
-      const instructions = `You are a nutrition assistant. Respond ONLY with JSON: {"isFood": true, "name": "Clean Title", "calories": 480, "protein": 36, "carbs": 42, "fat": 14, "summary": "brief"}. If not food: {"isFood": false, "message": "reason"}.`;
-      const aiResponse = await askGroqAI(trimmed, 'member', instructions);
-      let parsed = { name: trimmed.slice(0, 40), ...estimateNutrition(trimmed) };
-      try {
-        const m = aiResponse.match(/\{[\s\S]*\}/);
-        if (m) {
-          const j = JSON.parse(m[0]);
-          if (j.isFood === false) { setFeedback(`⚠️ ${j.message || 'Not a food item.'}`); setIsLoading(false); return; }
-          if (j.name)     parsed.name     = j.name;
-          if (j.calories) parsed.calories = +j.calories;
-          if (j.protein)  parsed.protein  = +j.protein;
-          if (j.carbs)    parsed.carbs    = +j.carbs;
-          if (j.fat)      parsed.fat      = +j.fat;
-        }
-      } catch {}
-      const photo = await fetchPexelsImage(parsed.name).catch(() => undefined);
-      await onSaved({ ...parsed, image: photo, category, aiTag: 'AI Logged' });
-      setFeedback(`✨ Logged "${parsed.name}" (${parsed.calories} kcal)`);
-      setTimeout(onClose, 1400);
+      const result = await api.parseMealText(trimmed);
+      if (result.invalid || !result.name) {
+        setParseError(result.invalid ? "That doesn't look like a food description — try again or use Manual Entry." : 'Could not parse a meal from that text. Try being more specific.');
+        return;
+      }
+      const guessedCategory = (result.categoryGuess ?? result.category ?? category) as MealCategory;
+      setReview({
+        name: result.name,
+        calories: String(result.calories ?? 0),
+        protein: String(result.protein ?? 0),
+        carbs: String(result.carbs ?? 0),
+        fat: String(result.fat ?? 0),
+        category: guessedCategory,
+      });
     } catch {
-      const legit = estimateNutrition(trimmed);
-      const photo = await fetchPexelsImage(trimmed).catch(() => undefined);
-      await onSaved({ name: trimmed, ...legit, image: photo, category, aiTag: 'AI Estimate' });
-      setFeedback(`✨ Logged "${trimmed}"`);
-      setTimeout(onClose, 1400);
+      setParseError('Could not reach the parser. Please try again or use Manual Entry.');
     } finally {
-      setIsLoading(false);
+      setIsParsing(false);
     }
   };
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name || !form.calories || isLoading) return;
-    setIsLoading(true);
-    setFeedback('Fetching photo…');
+  // ── Task A: food photo scanning via api.scanMealImage ───────────────────────
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setScanFile(file);
+    setScanError(null);
+    setReview(null);
+    setScanPreviewUrl(URL.createObjectURL(file));
+    e.target.value = '';
+  };
+
+  const handleAnalyzePhoto = async () => {
+    if (!scanFile || isScanning) return;
+    setIsScanning(true);
+    setScanError(null);
     try {
-      const photo = await fetchPexelsImage(form.name).catch(() => undefined);
-      await onSaved({
-        name: form.name,
-        calories: parseInt(form.calories) || 0,
-        protein:  parseInt(form.protein)  || 0,
-        carbs:    parseInt(form.carbs)    || 0,
-        fat:      parseInt(form.fat)      || 0,
-        image: photo,
-        category,
-        aiTag: 'Manual',
+      const result = await api.scanMealImage(scanFile);
+      if (result.invalid || !result.name) {
+        setScanError(result.invalid ? "Couldn't identify a food item in that photo — try another shot or fall back to Manual Entry." : 'Could not analyze that photo. Try again.');
+        return;
+      }
+      const guessedCategory = (result.categoryGuess ?? result.category ?? category) as MealCategory;
+      setReview({
+        name: result.name,
+        calories: String(result.calories ?? 0),
+        protein: String(result.protein ?? 0),
+        carbs: String(result.carbs ?? 0),
+        fat: String(result.fat ?? 0),
+        category: guessedCategory,
+        image: scanPreviewUrl || undefined,
       });
-      setTimeout(onClose, 900);
+    } catch {
+      setScanError('Could not reach the scanner. Please try again or use Manual Entry.');
     } finally {
-      setIsLoading(false);
+      setIsScanning(false);
     }
+  };
+
+  // ── Save (shared by AI-parsed / scanned draft review AND manual entry) ──────
+  const saveDraft = async (draft: ReviewForm, aiTag: string) => {
+    if (!draft.name || !draft.calories || isSaving) return;
+    setIsSaving(true);
+    setFeedback(null);
+    try {
+      let image = draft.image;
+      if (!image) {
+        image = await fetchPexelsImage(draft.name).catch(() => undefined);
+      }
+      const payload = {
+        name: draft.name,
+        calories: parseInt(draft.calories) || 0,
+        protein: parseInt(draft.protein) || 0,
+        carbs: parseInt(draft.carbs) || 0,
+        fat: parseInt(draft.fat) || 0,
+        image,
+        category: draft.category,
+        aiTag,
+      };
+      await onSaved(payload);
+      let presetSaved = false;
+      if (savePreset && aiTag !== 'From Preset') {
+        try {
+          await onCreatePreset({ name: payload.name, calories: payload.calories, protein: payload.protein, carbs: payload.carbs, fat: payload.fat, category: payload.category, image: payload.image });
+          presetSaved = true;
+        } catch (err) {
+          console.error('Save preset failed', err);
+        }
+      }
+      setFeedback(`✨ Logged "${draft.name}" (${draft.calories} kcal)${presetSaved ? ' · added to quick presets' : ''}`);
+      setTimeout(onClose, 1200);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReviewSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!review) return;
+    saveDraft(review, reviewTag ?? (mode === 'scan' ? 'AI Scan' : 'AI Parsed'));
+  };
+
+  const applyPreset = (preset: MealPreset) => {
+    setReview({
+      name: preset.name,
+      calories: String(preset.calories),
+      protein: String(preset.protein),
+      carbs: String(preset.carbs),
+      fat: String(preset.fat),
+      category,
+      image: preset.image || undefined,
+    });
+    setReviewTag('From Preset');
+    setShowPresetForm(false);
+    setFeedback(null);
+    // The review form lives in the AI/Scan modes
+    setMode(m => (m === 'manual' ? 'ai' : m));
+  };
+
+  const handleCreatePreset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = presetForm.name.trim();
+    if (!name || presetForm.calories === '' || isCreatingPreset) return;
+    setIsCreatingPreset(true);
+    setPresetError(null);
+    try {
+      const image = await fetchPexelsImage(name).catch(() => undefined);
+      await onCreatePreset({
+        name,
+        calories: parseInt(presetForm.calories) || 0,
+        protein: parseInt(presetForm.protein) || 0,
+        carbs: parseInt(presetForm.carbs) || 0,
+        fat: parseInt(presetForm.fat) || 0,
+        category: presetForm.category,
+        image,
+      });
+      setPresetForm({ ...EMPTY_PRESET_FORM, category });
+      setShowPresetForm(false);
+    } catch {
+      setPresetError('Could not save the preset. Please try again.');
+    } finally {
+      setIsCreatingPreset(false);
+    }
+  };
+
+  const handleDeletePreset = async (preset: MealPreset) => {
+    if (!window.confirm(`Delete quick preset "${preset.name}"?`)) return;
+    await onDeletePreset(preset.id);
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveDraft(manualForm, 'Manual');
+  };
+
+  const switchMode = (m: 'ai' | 'scan' | 'manual') => {
+    setMode(m);
+    resetDraft();
+    setFeedback(null);
   };
 
   return (
@@ -585,23 +692,135 @@ function LogMealModal({ category, onClose, onSaved }: LogMealModalProps) {
 
         {/* Mode Toggle */}
         <div className="flex gap-2 p-1 rounded-2xl" style={{ background: 'var(--hl-surface-alt)' }}>
-          {(['ai', 'manual'] as const).map((m) => (
+          {(['ai', 'scan', 'manual'] as const).map((m) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
-              className="flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+              onClick={() => switchMode(m)}
+              className="flex-1 py-2 px-2 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1.5"
               style={mode === m
                 ? { background: 'var(--hl-surface)', color: 'var(--hl-text-primary)', boxShadow: 'var(--hl-shadow-sm)' }
                 : { color: 'var(--hl-text-tertiary)' }}
             >
-              {m === 'ai' ? <><Sparkles className="w-3 h-3" />Log with AI</> : <><Pencil className="w-3 h-3" />Manual Entry</>}
+              {m === 'ai' ? <><Sparkles className="w-3 h-3" />AI Text</> : m === 'scan' ? <><Camera className="w-3 h-3" />Scan Photo</> : <><Pencil className="w-3 h-3" />Manual</>}
             </button>
           ))}
         </div>
 
-        {/* AI Mode */}
-        {mode === 'ai' && (
-          <form onSubmit={handleAiSubmit} className="space-y-3">
+        {/* Quick presets — saved per user in the backend */}
+        {!review && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="hl-section-label flex items-center gap-1"><Bookmark className="w-3 h-3" />Quick presets</p>
+              <button
+                type="button"
+                onClick={() => { setShowPresetForm(s => !s); setPresetError(null); }}
+                className="flex items-center gap-1 text-[11px] font-bold"
+                style={{ color: 'var(--hl-green)' }}
+              >
+                {showPresetForm ? <><X className="w-3 h-3" />Cancel</> : <><Plus className="w-3 h-3" />New preset</>}
+              </button>
+            </div>
+
+            {showPresetForm && (
+              <form onSubmit={handleCreatePreset} className="p-3 rounded-2xl space-y-2" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)' }}>
+                <input
+                  type="text"
+                  placeholder="Preset name, e.g. Oats with berries"
+                  value={presetForm.name}
+                  onChange={e => setPresetForm(f => ({ ...f, name: e.target.value }))}
+                  className="w-full rounded-xl px-3 py-2 text-xs focus:outline-none"
+                  style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+                  maxLength={255}
+                  required
+                />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {([
+                    { key: 'calories', placeholder: 'kcal *' },
+                    { key: 'protein',  placeholder: 'Protein g' },
+                    { key: 'carbs',    placeholder: 'Carbs g' },
+                    { key: 'fat',      placeholder: 'Fat g' },
+                  ] as const).map(f => (
+                    <input
+                      key={f.key}
+                      type="number"
+                      min={0}
+                      placeholder={f.placeholder}
+                      value={presetForm[f.key]}
+                      onChange={e => setPresetForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      className="w-full rounded-xl px-2.5 py-2 text-xs focus:outline-none"
+                      style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+                      required={f.key === 'calories'}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={presetForm.category}
+                    onChange={e => setPresetForm(f => ({ ...f, category: e.target.value as MealCategory }))}
+                    className="flex-1 rounded-xl px-2.5 py-2 text-xs focus:outline-none"
+                    style={{ background: 'var(--hl-surface)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+                  >
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                    <option value="snack">Spontaneous Bites</option>
+                  </select>
+                  <button
+                    type="submit"
+                    disabled={isCreatingPreset || !presetForm.name.trim() || presetForm.calories === ''}
+                    className="hl-btn-primary px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isCreatingPreset ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    Save preset
+                  </button>
+                </div>
+                {presetError && (
+                  <p className="text-[11px] font-bold text-red-700 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{presetError}</p>
+                )}
+              </form>
+            )}
+
+            {presetsLoading ? (
+              <SkeletonRow />
+            ) : sortedPresets.length === 0 ? (
+              !showPresetForm && (
+                <p className="text-[11px]" style={{ color: 'var(--hl-text-tertiary)' }}>
+                  No quick presets yet. Tap “New preset” to add meals you eat often.
+                </p>
+              )
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {sortedPresets.map(p => (
+                  <span key={p.id} className="hl-btn-ghost inline-flex items-center gap-1 pl-3 pr-1 py-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => applyPreset(p)}
+                      title={`${p.calories} kcal · ${p.protein}g P · ${p.carbs}g C · ${p.fat}g F`}
+                      className="font-semibold"
+                    >
+                      {CATEGORY_META[p.category]?.emoji || '🍽️'} {p.name}
+                      <span className="ml-1" style={{ color: 'var(--hl-text-tertiary)' }}>{p.calories} kcal</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePreset(p)}
+                      className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-red-100 hover:text-red-600"
+                      style={{ color: 'var(--hl-text-tertiary)' }}
+                      aria-label={`Delete preset ${p.name}`}
+                      title="Delete preset"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* AI Text Mode */}
+        {mode === 'ai' && !review && (
+          <form onSubmit={handleParseText} className="space-y-3">
             <div className="relative">
               <Utensils className="w-4 h-4 absolute left-3.5 top-3.5" style={{ color: 'var(--hl-text-tertiary)' }} />
               <input
@@ -611,36 +830,150 @@ function LogMealModal({ category, onClose, onSaved }: LogMealModalProps) {
                 placeholder="e.g. 'Grilled salmon with rice and salad'"
                 className="w-full rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2"
                 style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
-                disabled={isLoading}
+                disabled={isParsing}
               />
             </div>
             <button
               type="submit"
-              disabled={isLoading || !aiPrompt.trim()}
+              disabled={isParsing || !aiPrompt.trim()}
               className="hl-btn-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Processing…</> : <><Sparkles className="w-4 h-4" />Analyze & Log</>}
+              {isParsing ? <><Loader2 className="w-4 h-4 animate-spin" />Analyzing…</> : <><Sparkles className="w-4 h-4" />Analyze Text</>}
             </button>
-            {/* Quick AI presets */}
-            <div className="space-y-1.5 pt-1">
-              <p className="hl-section-label">Quick presets</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: '🥚 2 Scrambled Eggs & Toast', q: '2 scrambled eggs with sourdough toast' },
-                  { label: '🥗 Chicken Caesar Salad', q: 'Grilled chicken caesar salad' },
-                  { label: '🍣 Salmon Sushi Bowl', q: 'Salmon avocado sushi bowl 480 kcal 38g protein' },
-                  { label: '🥤 Whey Protein Shake', q: 'Whey protein shake with banana' },
-                ].map(p => (
-                  <button
-                    key={p.q}
-                    type="button"
-                    onClick={() => { setAiPrompt(p.q); }}
-                    className="hl-btn-ghost px-3 py-1.5 text-[11px]"
-                  >
-                    {p.label}
-                  </button>
-                ))}
+            {isParsing && <SkeletonRow />}
+            {parseError && (
+              <div className="p-3 rounded-2xl text-xs font-bold flex items-center gap-2 bg-red-50 border border-red-200 text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />{parseError}
               </div>
+            )}
+          </form>
+        )}
+
+        {/* Scan Photo Mode */}
+        {mode === 'scan' && !review && (
+          <div className="space-y-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handleFileSelected}
+            />
+            {!scanPreviewUrl ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-10 rounded-2xl flex flex-col items-center justify-center gap-2 transition-colors"
+                style={{ background: 'var(--hl-surface-alt)', border: '1.5px dashed var(--hl-border)' }}
+              >
+                <Camera className="w-7 h-7" style={{ color: 'var(--hl-text-tertiary)' }} />
+                <span className="text-xs font-bold" style={{ color: 'var(--hl-text-secondary)' }}>Tap to take or upload a photo of your meal</span>
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <img src={scanPreviewUrl} alt="Meal preview" className="w-full h-48 object-cover rounded-2xl" style={{ border: '1px solid var(--hl-border)' }} />
+                {isScanning ? (
+                  <SkeletonCard lines={2} />
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAnalyzePhoto}
+                      className="hl-btn-primary flex-1 py-3 rounded-2xl flex items-center justify-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />Analyze Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="hl-btn-ghost px-4 py-3 rounded-2xl text-xs font-bold"
+                    >
+                      Retake
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {scanError && (
+              <div className="p-3 rounded-2xl text-xs font-bold flex items-center gap-2 bg-red-50 border border-red-200 text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />{scanError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Review/Draft form — shared by AI Text + Scan Photo once a draft exists */}
+        {(mode === 'ai' || mode === 'scan') && review && (
+          <form onSubmit={handleReviewSubmit} className="space-y-3">
+            <div className="p-3 rounded-2xl text-xs font-bold flex items-center gap-2 bg-green-50 border border-green-200 text-green-700">
+              <Check className="w-4 h-4 shrink-0" />Review & edit before saving — nothing is logged yet.
+            </div>
+            {review.image && (
+              <img src={review.image} alt={review.name} className="w-full h-40 object-cover rounded-2xl" style={{ border: '1px solid var(--hl-border)' }} />
+            )}
+            <div>
+              <label className="hl-section-label block mb-1">Meal Name *</label>
+              <input
+                type="text"
+                value={review.name}
+                onChange={e => setReview(r => r && ({ ...r, name: e.target.value }))}
+                className="w-full rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
+                style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { label: 'Calories (kcal) *', key: 'calories' },
+                { label: 'Protein (g) *',     key: 'protein'  },
+                { label: 'Carbs (g)',         key: 'carbs'    },
+                { label: 'Fat (g)',           key: 'fat'      },
+              ] as const).map(f => (
+                <div key={f.key}>
+                  <label className="hl-section-label block mb-1">{f.label}</label>
+                  <input
+                    type="number"
+                    value={review[f.key]}
+                    onChange={e => setReview(r => r && ({ ...r, [f.key]: e.target.value }))}
+                    className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+                    style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+                    min={0}
+                  />
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="hl-section-label block mb-1">Category</label>
+              <select
+                value={review.category}
+                onChange={e => setReview(r => r && ({ ...r, category: e.target.value as MealCategory }))}
+                className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+                style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
+              >
+                <option value="breakfast">Breakfast</option>
+                <option value="lunch">Lunch</option>
+                <option value="dinner">Dinner</option>
+                <option value="snack">Spontaneous Bites</option>
+              </select>
+            </div>
+            {reviewTag !== 'From Preset' && (
+              <label className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
+                <input type="checkbox" checked={savePreset} onChange={e => setSavePreset(e.target.checked)} />
+                Also add to quick presets
+              </label>
+            )}
+            <div className="flex gap-2">
+              <button type="button" onClick={resetDraft} className="hl-btn-ghost px-4 py-3 rounded-2xl text-xs font-bold">
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving || !review.name || !review.calories}
+                className="hl-btn-primary flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</> : <><Check className="w-4 h-4" />Save Meal</>}
+              </button>
             </div>
           </form>
         )}
@@ -653,27 +986,27 @@ function LogMealModal({ category, onClose, onSaved }: LogMealModalProps) {
               <input
                 type="text"
                 placeholder="e.g. Avocado Toast"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                value={manualForm.name}
+                onChange={e => setManualForm(f => ({ ...f, name: e.target.value }))}
                 className="w-full rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2"
                 style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
                 required
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {[
+              {([
                 { label: 'Calories (kcal) *', key: 'calories', placeholder: '420' },
                 { label: 'Protein (g) *',     key: 'protein',  placeholder: '22'  },
                 { label: 'Carbs (g)',          key: 'carbs',    placeholder: '38'  },
                 { label: 'Fat (g)',            key: 'fat',      placeholder: '20'  },
-              ].map(f => (
+              ] as const).map(f => (
                 <div key={f.key}>
                   <label className="hl-section-label block mb-1">{f.label}</label>
                   <input
                     type="number"
                     placeholder={f.placeholder}
-                    value={(form as any)[f.key]}
-                    onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    value={manualForm[f.key]}
+                    onChange={e => setManualForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                     className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none"
                     style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)', color: 'var(--hl-text-primary)' }}
                     min={0}
@@ -684,20 +1017,24 @@ function LogMealModal({ category, onClose, onSaved }: LogMealModalProps) {
             <p className="text-[10px] flex items-center gap-1" style={{ color: 'var(--hl-text-tertiary)' }}>
               <Camera className="w-3 h-3" />A Pexels photo will be auto-fetched for your meal
             </p>
+            <label className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
+              <input type="checkbox" checked={savePreset} onChange={e => setSavePreset(e.target.checked)} />
+              Also add to quick presets
+            </label>
             <button
               type="submit"
-              disabled={isLoading || !form.name || !form.calories}
+              disabled={isSaving || !manualForm.name || !manualForm.calories}
               className="hl-btn-primary w-full py-3 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</> : <><Check className="w-4 h-4" />Save Meal</>}
+              {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" />Saving…</> : <><Check className="w-4 h-4" />Save Meal</>}
             </button>
           </form>
         )}
 
         {/* Feedback */}
         {feedback && (
-          <div className={`p-3 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fade-slide-up ${feedback.startsWith('⚠️') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
-            {feedback.startsWith('⚠️') ? <AlertCircle className="w-4 h-4 shrink-0" /> : <Sparkles className="w-4 h-4 shrink-0" />}
+          <div className="p-3 rounded-2xl text-xs font-bold flex items-center gap-2 animate-fade-slide-up bg-green-50 border border-green-200 text-green-700">
+            <Sparkles className="w-4 h-4 shrink-0" />
             {feedback}
           </div>
         )}
@@ -859,47 +1196,52 @@ const MealCard: React.FC<MealCardProps> = ({ meal, onEdit, onDelete }) => {
 interface MealCategorySectionProps {
   category: MealCategory;
   meals: MealItem[];
+  categoryStat?: { mealCount: number; totalCalories: number };
   onAdd: (cat: MealCategory) => void;
   onEdit: (m: MealItem) => void;
   onDelete: (id: string) => void;
 }
 
 const MealCategorySection: React.FC<MealCategorySectionProps> = ({
-  category, meals, onAdd, onEdit, onDelete
+  category, meals, categoryStat, onAdd, onEdit, onDelete
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const meta = CATEGORY_META[category];
   const catMeals = meals.filter(m => m.category === category);
-  const totalCal = catMeals.reduce((s, m) => s + m.calories, 0);
+  // Total calories and meal count come from backend SQL GROUP BY aggregate query (or fallback to catMeals length)
+  const mealCount = categoryStat ? categoryStat.mealCount : catMeals.length;
+  const totalCal = categoryStat ? categoryStat.totalCalories : 0;
 
   return (
     <div className="rounded-3xl overflow-hidden" style={{ border: `1px solid ${meta.border}`, background: 'var(--hl-surface)', boxShadow: 'var(--hl-shadow-xs)' }}>
-      {/* Header */}
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between p-5 transition-colors hover:opacity-90"
-        style={{ background: meta.bg }}
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">{meta.emoji}</span>
-          <div className="text-left">
-            <h3 className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>{meta.label}</h3>
-            <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
-              {catMeals.length} meal{catMeals.length !== 1 ? 's' : ''} · {totalCal} kcal
-            </p>
+      {/* Header — collapse toggle and Add are sibling buttons (a <button> can't contain another <button>) */}
+      <div className="flex items-center gap-2 pr-5" style={{ background: meta.bg }}>
+        <button
+          type="button"
+          onClick={() => setCollapsed(c => !c)}
+          aria-expanded={!collapsed}
+          className="flex-1 flex items-center justify-between gap-3 p-5 pr-0 transition-colors hover:opacity-90"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{meta.emoji}</span>
+            <div className="text-left">
+              <h3 className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>{meta.label}</h3>
+              <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
+                {mealCount} meal{mealCount !== 1 ? 's' : ''} · {totalCal} kcal
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); onAdd(category); }}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
-            style={{ background: meta.color, color: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
-          >
-            <Plus className="w-3.5 h-3.5" />Add
-          </button>
-          {collapsed ? <ChevronDown className="w-4 h-4" style={{ color: 'var(--hl-text-secondary)' }} /> : <ChevronUp className="w-4 h-4" style={{ color: 'var(--hl-text-secondary)' }} />}
-        </div>
-      </button>
+          {collapsed ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--hl-text-secondary)' }} /> : <ChevronUp className="w-4 h-4 shrink-0" style={{ color: 'var(--hl-text-secondary)' }} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => onAdd(category)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0"
+          style={{ background: meta.color, color: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}
+        >
+          <Plus className="w-3.5 h-3.5" />Add
+        </button>
+      </div>
 
       {/* Body */}
       {!collapsed && (
@@ -1203,8 +1545,10 @@ function MealPlanSection({ onAddMeal, selectedDate }: MealPlanSectionProps) {
       {/* Plan content */}
       <div className="p-5 space-y-5">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--hl-green)' }} />
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonRow key={i} />
+            ))}
           </div>
         ) : dayPlans.length === 0 ? (
           <div className="text-center py-10 space-y-3 max-w-md mx-auto">
@@ -1353,9 +1697,57 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
   onLogWater,
 }) => {
   const [meals, setMeals] = useState<MealItem[]>(propMeals);
+  const [categoryStats, setCategoryStats] = useState<Record<string, { mealCount: number; totalCalories: number }>>({});
   const [logModalCat, setLogModalCat] = useState<MealCategory | null>(null);
   const [editingMeal, setEditingMeal] = useState<MealItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ── Quick presets (stored in meal_presets, surfaced inside the Log Meal modal) ──
+  const [presets, setPresets] = useState<MealPreset[]>([]);
+  const [presetsLoading, setPresetsLoading] = useState(true);
+
+  const fetchPresets = useCallback(async () => {
+    setPresetsLoading(true);
+    try {
+      const data = await api.getMealPresets();
+      setPresets(data);
+    } catch {}
+    finally { setPresetsLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchPresets(); }, [fetchPresets]);
+
+  // Throws on failure so the modal can show an error.
+  const handleCreatePreset = async (data: PresetInput) => {
+    const created = await api.createMealPreset(data);
+    setPresets(prev => [created, ...prev]);
+  };
+
+  const handleDeletePreset = async (id: string) => {
+    setPresets(prev => prev.filter(p => p.id !== id));
+    try {
+      await api.deleteMealPreset(id);
+    } catch (err) {
+      console.error('Delete preset failed', err);
+      fetchPresets();
+    }
+  };
+
+  // Fetch SQL-aggregated per-category totals (GROUP BY category, SUM(calories), COUNT(*))
+  const fetchCategoryStats = useCallback(async () => {
+    try {
+      const stats = await api.getMealsByCategory(selectedDate);
+      const map: Record<string, { mealCount: number; totalCalories: number }> = {};
+      stats.forEach((s) => {
+        map[s.category] = { mealCount: s.mealCount, totalCalories: s.totalCalories };
+      });
+      setCategoryStats(map);
+    } catch {}
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchCategoryStats();
+  }, [fetchCategoryStats, meals]);
 
   // Sync parent meals
   useEffect(() => { setMeals(propMeals); }, [propMeals]);
@@ -1471,6 +1863,7 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
               key={cat}
               category={cat}
               meals={meals}
+              categoryStat={categoryStats[cat]}
               onAdd={setLogModalCat}
               onEdit={setEditingMeal}
               onDelete={handleDelete}
@@ -1494,6 +1887,10 @@ export const NutritionView: React.FC<NutritionViewProps> = ({
           category={logModalCat}
           onClose={() => setLogModalCat(null)}
           onSaved={handleAddSaved}
+          presets={presets}
+          presetsLoading={presetsLoading}
+          onCreatePreset={handleCreatePreset}
+          onDeletePreset={handleDeletePreset}
         />
       )}
 

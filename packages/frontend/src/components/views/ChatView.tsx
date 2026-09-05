@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Conversation, ChatMessage, UserProfile } from '../../types';
+import { Conversation, ChatMessage, UserProfile, CoachAssignment } from '../../types';
 import { api } from '../../services/api';
-import { MessageSquare, Send, Loader2, AlertCircle, ChevronLeft, Users, Dumbbell, Apple, Sparkles } from 'lucide-react';
+import { MessageSquare, Send, Loader2, AlertCircle, ChevronLeft, Users, Dumbbell, Apple, Sparkles, UserPlus } from 'lucide-react';
+import { useConversationPolling } from '../../hooks/useConversationPolling';
+import { SkeletonRow, SkeletonChatBubble } from '../ui/Skeleton';
+import { Button } from '../ui/Button';
+import { FindCoachModal } from '../FindCoachModal';
 
 interface ChatViewProps {
   user: UserProfile;
@@ -16,9 +20,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ user }) => {
   const [isLoadingMsgs, setIsLoadingMsgs] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFindCoachOpen, setIsFindCoachOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const loadConversations = () => {
     setIsLoadingConvs(true);
     api.getConversations()
       .then((data) => {
@@ -29,8 +34,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ user }) => {
       })
       .catch((e) => setError(e?.message || 'Failed to load conversations.'))
       .finally(() => setIsLoadingConvs(false));
+  };
+
+  useEffect(() => {
+    loadConversations();
   }, []);
 
+  // Initial and selected conversation message load
   useEffect(() => {
     if (!selectedConv) return;
     setIsLoadingMsgs(true);
@@ -39,6 +49,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ user }) => {
       .catch((e) => setError(e?.message || 'Failed to load messages.'))
       .finally(() => setIsLoadingMsgs(false));
   }, [selectedConv]);
+
+  // Real-time polling for messages & conversation updates
+  useConversationPolling(selectedConv, setMessages, setConversations);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -141,19 +154,42 @@ export const ChatView: React.FC<ChatViewProps> = ({ user }) => {
               <Users className="w-4 h-4" style={{ color: 'var(--hl-lavender)' }} />
               {user.role === 'coach' ? 'Client Roster' : 'Your Coaches'}
             </h2>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
-              {conversations.length} Active
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">
+                {conversations.length} Active
+              </span>
+              {user.role === 'member' && conversations.length > 0 && (
+                <button
+                  onClick={() => setIsFindCoachOpen(true)}
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full hl-card-hover flex items-center gap-1"
+                  style={{ background: 'var(--hl-surface-alt)', color: 'var(--hl-text-secondary)', border: '1px solid var(--hl-border)' }}
+                >
+                  <UserPlus className="w-3 h-3" />
+                  Find
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {isLoadingConvs ? (
-              <div className="flex items-center justify-center py-10" style={{ color: 'var(--hl-text-tertiary)' }}>
-                <Loader2 className="w-5 h-5 animate-spin mr-2" style={{ color: 'var(--hl-lavender)' }} />
-                <span className="text-xs">Loading…</span>
+              <div className="space-y-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <SkeletonRow key={i} />
+                ))}
               </div>
             ) : conversations.length === 0 ? (
-              <p className="text-center text-xs py-8" style={{ color: 'var(--hl-text-tertiary)' }}>No conversations yet.</p>
+              <div className="text-center py-8 space-y-3">
+                <p className="text-xs" style={{ color: 'var(--hl-text-tertiary)' }}>
+                  {user.role === 'coach' ? 'No clients yet.' : "You don't have a coach yet."}
+                </p>
+                {user.role === 'member' && (
+                  <Button size="sm" variant="primary" onClick={() => setIsFindCoachOpen(true)}>
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Find a Coach
+                  </Button>
+                )}
+              </div>
             ) : (
               conversations.map((conv) => {
                 const specialty = conv.partner.coachSpecialty || conv.partner.specialty;
@@ -313,9 +349,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ user }) => {
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3.5" style={{ background: 'var(--hl-surface)' }}>
                 {isLoadingMsgs ? (
-                  <div className="flex items-center justify-center py-10" style={{ color: 'var(--hl-text-tertiary)' }}>
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" style={{ color: 'var(--hl-lavender)' }} />
-                    <span className="text-xs">Loading messages…</span>
+                  <div className="space-y-3.5">
+                    <SkeletonChatBubble align="left" width="45%" />
+                    <SkeletonChatBubble align="right" width="35%" />
+                    <SkeletonChatBubble align="left" width="55%" />
+                    <SkeletonChatBubble align="right" width="30%" />
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="text-center py-12 space-y-2">
@@ -366,6 +404,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ user }) => {
           )}
         </div>
       </div>
+
+      {user.role === 'member' && (
+        <FindCoachModal
+          isOpen={isFindCoachOpen}
+          onClose={() => setIsFindCoachOpen(false)}
+          onAssigned={loadConversations}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CycleStatus, CyclePeriod, CycleSymptomDef, UserProfile } from '../../types';
 import { api } from '../../services/api';
+import { Skeleton, SkeletonCard } from '../ui/Skeleton';
 import {
   Calendar,
   Droplets,
@@ -21,22 +22,22 @@ import {
 // ─── Symptom definitions ──────────────────────────────────────────────────────
 
 const SYMPTOMS: CycleSymptomDef[] = [
-  { key: 'cramps',         label: 'Cramps',         icon: '🔥', category: 'physical'  },
-  { key: 'bloating',       label: 'Bloating',        icon: '💨', category: 'digestive' },
-  { key: 'headache',       label: 'Headache',        icon: '🤕', category: 'physical'  },
-  { key: 'back_pain',      label: 'Back pain',       icon: '🪨', category: 'physical'  },
-  { key: 'breast_tender',  label: 'Breast tenderness', icon: '💗', category: 'physical' },
-  { key: 'acne',           label: 'Acne',            icon: '🔴', category: 'physical'  },
-  { key: 'fatigue',        label: 'Fatigue',         icon: '😴', category: 'energy'   },
-  { key: 'high_energy',    label: 'High energy',     icon: '⚡', category: 'energy'   },
-  { key: 'mood_happy',     label: 'Happy',           icon: '😊', category: 'mood'     },
-  { key: 'mood_irritable', label: 'Irritable',       icon: '😤', category: 'mood'     },
-  { key: 'mood_anxious',   label: 'Anxious',         icon: '😰', category: 'mood'     },
-  { key: 'mood_low',       label: 'Low mood',        icon: '😞', category: 'mood'     },
-  { key: 'nausea',         label: 'Nausea',          icon: '🤢', category: 'digestive' },
-  { key: 'appetite_up',    label: 'Appetite ↑',      icon: '🍽️', category: 'digestive' },
-  { key: 'insomnia',       label: 'Insomnia',        icon: '🌙', category: 'energy'   },
-  { key: 'spotting',       label: 'Spotting',        icon: '🩸', category: 'physical'  },
+  { key: 'cramps', label: 'Cramps', icon: '🔥', category: 'physical' },
+  { key: 'bloating', label: 'Bloating', icon: '💨', category: 'digestive' },
+  { key: 'headache', label: 'Headache', icon: '🤕', category: 'physical' },
+  { key: 'back_pain', label: 'Back pain', icon: '🪨', category: 'physical' },
+  { key: 'breast_tender', label: 'Breast tenderness', icon: '💗', category: 'physical' },
+  { key: 'acne', label: 'Acne', icon: '🔴', category: 'physical' },
+  { key: 'fatigue', label: 'Fatigue', icon: '😴', category: 'energy' },
+  { key: 'high_energy', label: 'High energy', icon: '⚡', category: 'energy' },
+  { key: 'mood_happy', label: 'Happy', icon: '😊', category: 'mood' },
+  { key: 'mood_irritable', label: 'Irritable', icon: '😤', category: 'mood' },
+  { key: 'mood_anxious', label: 'Anxious', icon: '😰', category: 'mood' },
+  { key: 'mood_low', label: 'Low mood', icon: '😞', category: 'mood' },
+  { key: 'nausea', label: 'Nausea', icon: '🤢', category: 'digestive' },
+  { key: 'appetite_up', label: 'Appetite ↑', icon: '🍽️', category: 'digestive' },
+  { key: 'insomnia', label: 'Insomnia', icon: '🌙', category: 'energy' },
+  { key: 'spotting', label: 'Spotting', icon: '🩸', category: 'physical' },
 ];
 
 // ─── Phase metadata ────────────────────────────────────────────────────────────
@@ -93,9 +94,9 @@ const PHASE_META: Record<string, {
 
 const FLOW_LABELS: Record<string, { label: string; dot: string }> = {
   spotting: { label: 'Spotting', dot: '#FCA5A5' },
-  light:    { label: 'Light',    dot: '#F87171' },
-  medium:   { label: 'Medium',   dot: '#E8445A' },
-  heavy:    { label: 'Heavy',    dot: '#991B1B' },
+  light: { label: 'Light', dot: '#F87171' },
+  medium: { label: 'Medium', dot: '#E8445A' },
+  heavy: { label: 'Heavy', dot: '#991B1B' },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ function formatDate(dateStr: string | null): string {
 function daysFromNow(dateStr: string | null): number | null {
   if (!dateStr) return null;
   const target = new Date(dateStr + 'T00:00:00');
-  const today  = new Date();
+  const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
@@ -127,8 +128,8 @@ function getAiSimulationText(dateStr: string, status: CycleStatus | null): strin
 
   const targetDate = new Date(dateStr + 'T00:00:00');
   const nextPeriod = new Date(status.nextPeriodOn + 'T00:00:00');
-  const ovulation  = new Date(status.ovulationOn + 'T00:00:00');
-  
+  const ovulation = new Date(status.ovulationOn + 'T00:00:00');
+
   // Calculate relative day offsets to estimate phase on future date
   const diffDays = Math.round((targetDate.getTime() - nextPeriod.getTime()) / 86400000);
 
@@ -155,7 +156,7 @@ function getAiSimulationSymptoms(dateStr: string, status: CycleStatus | null): s
 
   const targetDate = new Date(dateStr + 'T00:00:00');
   const nextPeriod = new Date(status.nextPeriodOn + 'T00:00:00');
-  const ovulation  = new Date(status.ovulationOn + 'T00:00:00');
+  const ovulation = new Date(status.ovulationOn + 'T00:00:00');
   const diffDays = Math.round((targetDate.getTime() - nextPeriod.getTime()) / 86400000);
 
   if (diffDays >= 0 && diffDays < 5) {
@@ -191,15 +192,15 @@ const CalendarStrip: React.FC<CalendarStripProps> = ({ status, periods, selected
   periods.forEach(p => {
     if (!p.started_on) return;
     const start = new Date(p.started_on + 'T00:00:00');
-    const end   = p.ended_on ? new Date(p.ended_on + 'T00:00:00') : new Date(start.getTime() + 4 * 86400000);
+    const end = p.ended_on ? new Date(p.ended_on + 'T00:00:00') : new Date(start.getTime() + 4 * 86400000);
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       periodDates.add(toDateString(new Date(d)));
     }
   });
 
-  const fertileDates  = new Set(status.fertileDays);
+  const fertileDates = new Set(status.fertileDays);
   const ovulationDate = status.ovulationOn;
-  const today         = toDateString(new Date());
+  const today = toDateString(new Date());
 
   // 14 days starting from (today - 3 days + weekOffset * 7)
   const days: Date[] = [];
@@ -246,20 +247,20 @@ const CalendarStrip: React.FC<CalendarStripProps> = ({ status, periods, selected
 
       <div className="grid grid-cols-7 gap-1">
         {days.slice(0, 14).map((d, i) => {
-          const ds          = toDateString(d);
-          const isToday     = ds === today;
-          const isPeriod    = periodDates.has(ds);
-          const isFertile   = fertileDates.has(ds);
+          const ds = toDateString(d);
+          const isToday = ds === today;
+          const isPeriod = periodDates.has(ds);
+          const isFertile = fertileDates.has(ds);
           const isOvulation = ds === ovulationDate;
 
-          const isSelected  = ds === selectedDate;
+          const isSelected = ds === selectedDate;
 
-          let cellBg     = 'transparent';
-          let cellColor  = 'var(--hl-text-secondary)';
-          let dot        = '';
+          let cellBg = 'transparent';
+          let cellColor = 'var(--hl-text-secondary)';
+          let dot = '';
 
-          if (isPeriod)    { cellBg = 'rgba(232,68,90,0.15)';  cellColor = '#E8445A'; dot = '#E8445A'; }
-          if (isFertile)   { cellBg = 'rgba(45,174,124,0.12)'; cellColor = '#2DAE7C'; dot = '#2DAE7C'; }
+          if (isPeriod) { cellBg = 'rgba(232,68,90,0.15)'; cellColor = '#E8445A'; dot = '#E8445A'; }
+          if (isFertile) { cellBg = 'rgba(45,174,124,0.12)'; cellColor = '#2DAE7C'; dot = '#2DAE7C'; }
           if (isOvulation) { cellBg = 'rgba(124,92,252,0.18)'; cellColor = '#7C5CFC'; dot = '#7C5CFC'; }
 
           return (
@@ -320,13 +321,13 @@ interface PeriodLoggerProps {
 }
 
 const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh }) => {
-  const [flow, setFlow]           = useState<string>('medium');
-  const [logging, setLogging]     = useState(false);
-  const [ending, setEnding]       = useState(false);
-  const [showForm, setShowForm]   = useState(false);
+  const [flow, setFlow] = useState<string>('medium');
+  const [logging, setLogging] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   const activePeriod = periods.find(p => !p.ended_on);
-  const todayStr     = toDateString(new Date());
+  const todayStr = toDateString(new Date());
 
   const handleLogStart = async () => {
     setLogging(true);
@@ -356,7 +357,7 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
 
   if (activePeriod) {
     const startDays = daysFromNow(activePeriod.started_on);
-    const daysAgo   = startDays !== null ? Math.abs(startDays) : 0;
+    const daysAgo = startDays !== null ? Math.abs(startDays) : 0;
     return (
       <div className="space-y-3">
         <div
@@ -388,7 +389,7 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
             style={{ background: 'rgba(232,68,90,0.1)', color: '#E8445A', border: '1px solid rgba(232,68,90,0.25)' }}
           >
             {ending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-            Period ended today
+            Mark Period as Ended
           </button>
         </div>
       </div>
@@ -498,9 +499,8 @@ const SymptomGrid: React.FC<SymptomGridProps> = ({ todaysSymptoms, onToggle, dis
                   key={s.key}
                   onClick={() => handleToggle(s.key)}
                   disabled={disabled || !!pending}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all text-left ${
-                    disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all text-left ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
                   style={
                     active
                       ? { background: 'rgba(124,92,252,0.1)', borderColor: 'rgba(124,92,252,0.35)', color: '#7C5CFC' }
@@ -529,10 +529,26 @@ interface CycleTrackerViewProps {
 }
 
 export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user }) => {
-  const [status,  setStatus]  = useState<CycleStatus | null>(null);
+  const [status, setStatus] = useState<CycleStatus | null>(null);
   const [periods, setPeriods] = useState<CyclePeriod[]>([]);
+  const [analytics, setAnalytics] = useState<{
+    totalPeriodsLogged: number;
+    avgPeriodDurationDays: number;
+    firstPeriodDate: string | null;
+    latestPeriodDate: string | null;
+    totalSymptomsDuringMenstruation: number;
+    topSymptoms: Array<{ symptomKey: string; occurrences: number; lastLoggedOn: string }>;
+    flowDistribution: Array<{ flow: string; count: number }>;
+  } | null>(null);
+  const [timeline, setTimeline] = useState<Array<{
+    eventDate: string;
+    eventType: string;
+    title: string;
+    phaseTag: string;
+    refId: string | null;
+  }>>([]);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Tracks which calendar date is selected (defaults to today)
   const todayStr = toDateString(new Date());
@@ -542,9 +558,16 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
 
   const load = useCallback(async () => {
     try {
-      const [s, p] = await Promise.all([api.getCycleStatus(), api.getCyclePeriods()]);
+      const [s, p, a, t] = await Promise.all([
+        api.getCycleStatus(),
+        api.getCyclePeriods(),
+        api.getCycleAnalytics().catch(() => null),
+        api.getCycleTimeline().catch(() => []),
+      ]);
       setStatus(s);
       setPeriods(p);
+      if (a) setAnalytics(a);
+      if (t) setTimeline(t);
       setError(null);
     } catch (e: any) {
       setError(e.message ?? 'Failed to load cycle data');
@@ -589,10 +612,14 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--hl-lavender)' }} />
-          <p className="text-sm" style={{ color: 'var(--hl-text-tertiary)' }}>Loading your cycle data…</p>
+      <div className="space-y-5">
+        <div className="hl-card p-6 space-y-4">
+          <Skeleton height="1.25rem" width="35%" />
+          <Skeleton height="8rem" width="100%" rounded="lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <SkeletonCard lines={3} />
+          <SkeletonCard lines={3} />
         </div>
       </div>
     );
@@ -618,7 +645,7 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
 
   if (!status) return null;
 
-  const phase     = PHASE_META[status.phase] ?? PHASE_META.unknown;
+  const phase = PHASE_META[status.phase] ?? PHASE_META.unknown;
   const daysToNext = daysFromNow(status.nextPeriodOn);
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -740,7 +767,7 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
                   <Heart className="w-4 h-4" />
                 </div>
                 <h2 className="text-sm font-bold" style={{ color: 'var(--hl-text-primary)' }}>
-                  {selectedDate > todayStr 
+                  {selectedDate > todayStr
                     ? `AI Predictions for ${formatDate(selectedDate)}`
                     : `Logs for ${selectedDate === todayStr ? 'Today' : formatDate(selectedDate)}`
                   }
@@ -782,9 +809,9 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
                 </div>
               </div>
             ) : (
-              <SymptomGrid 
-                todaysSymptoms={selectedDateSymptoms} 
-                onToggle={handleToggleSymptom} 
+              <SymptomGrid
+                todaysSymptoms={selectedDateSymptoms}
+                onToggle={handleToggleSymptom}
                 disabled={selectedDate > todayStr}
               />
             )}
@@ -814,9 +841,9 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
               <div className="space-y-2.5">
                 {[
                   { label: 'Avg cycle length', value: `${status.avgCycleLength} days` },
-                  { label: 'Cycles tracked',   value: `${periods.length}` },
-                  { label: 'Last period',       value: formatDate(status.periodStartedOn) },
-                  { label: 'Period ended',      value: status.periodEndedOn ? formatDate(status.periodEndedOn) : status.isOnPeriod ? 'Ongoing' : '—' },
+                  { label: 'Cycles tracked', value: `${periods.length}` },
+                  { label: 'Last period', value: formatDate(status.periodStartedOn) },
+                  { label: 'Period ended', value: status.periodEndedOn ? formatDate(status.periodEndedOn) : status.isOnPeriod ? 'Ongoing' : '—' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-xs" style={{ color: 'var(--hl-text-secondary)' }}>{label}</span>
@@ -840,6 +867,125 @@ export const CycleTrackerView: React.FC<CycleTrackerViewProps> = ({ user: _user 
           )}
         </div>
       </div>
+
+      {/* ── SQL Aggregated Analytics & Biomarker Intelligence (COUNT, AVG, LEFT JOIN) ── */}
+      {analytics && analytics.totalPeriodsLogged > 0 && (
+        <div className="p-6 rounded-3xl hl-card space-y-5 border border-purple-200/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-purple-500/10 text-purple-600">
+                <Flower2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
+                  Hormonal Biomarker Intelligence
+                </h2>
+
+              </div>
+            </div>
+            <span className="hl-badge hl-badge-purple text-[10px]">
+              {analytics.totalPeriodsLogged} cycles analyzed
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-2xl" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}>
+              <p className="text-[10px] font-bold uppercase text-slate-400">Avg Period Duration</p>
+              <h4 className="text-xl font-extrabold mt-1" style={{ color: 'var(--hl-text-primary)' }}>
+                {analytics.avgPeriodDurationDays} <span className="text-xs font-normal text-slate-400">days</span>
+              </h4>
+            </div>
+
+            <div className="p-4 rounded-2xl" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}>
+              <p className="text-[10px] font-bold uppercase text-slate-400">Menstrual Symptoms (LEFT JOIN)</p>
+              <h4 className="text-xl font-extrabold mt-1" style={{ color: '#E8445A' }}>
+                {analytics.totalSymptomsDuringMenstruation} <span className="text-xs font-normal text-slate-400">logged</span>
+              </h4>
+            </div>
+
+            <div className="p-4 rounded-2xl" style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}>
+              <p className="text-[10px] font-bold uppercase text-slate-400">Tracking Range</p>
+              <h4 className="text-xs font-bold mt-1.5" style={{ color: 'var(--hl-text-primary)' }}>
+                {analytics.firstPeriodDate ? `${formatDate(analytics.firstPeriodDate)} — ${formatDate(analytics.latestPeriodDate)}` : 'Active'}
+              </h4>
+            </div>
+          </div>
+
+          {/* Top Symptoms */}
+          {analytics.topSymptoms.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Most Frequent Recurring Symptoms (SQL GROUP BY + COUNT)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {analytics.topSymptoms.map((ts) => {
+                  const def = SYMPTOMS.find((s) => s.key === ts.symptomKey);
+                  return (
+                    <div
+                      key={ts.symptomKey}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                      style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}
+                    >
+                      <span>{def?.icon || '🔹'}</span>
+                      <span style={{ color: 'var(--hl-text-primary)' }}>{def?.label || ts.symptomKey}</span>
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                        {ts.occurrences}x
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Chronological Cycle Timeline (SQL UNION ALL) ── */}
+      {timeline.length > 0 && (
+        <div className="p-6 rounded-3xl hl-card space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-teal-500/10 text-teal-600">
+              <Calendar className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
+                Biological Timeline Feed
+              </h2>
+              <p className="text-[11px]" style={{ color: 'var(--hl-text-secondary)' }}>
+                Combined period & symptom events generated by PostgreSQL SQL UNION ALL
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+            {timeline.slice(0, 15).map((ev, i) => (
+              <div
+                key={`${ev.eventDate}_${ev.eventType}_${i}`}
+                className="flex items-center justify-between p-3 rounded-2xl text-xs"
+                style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border-light)' }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-sm">
+                    {ev.eventType === 'period_start' ? '🩸' : ev.eventType === 'period_end' ? '✨' : '📝'}
+                  </span>
+                  <div>
+                    <p className="font-bold" style={{ color: 'var(--hl-text-primary)' }}>{ev.title}</p>
+                    <p className="text-[10px] text-slate-400">{formatDate(ev.eventDate)}</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${ev.eventType === 'period_start'
+                  ? 'bg-rose-100 text-rose-700'
+                  : ev.eventType === 'period_end'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-indigo-100 text-indigo-700'
+                  }`}>
+                  {ev.eventType.replace('_', ' ').toUpperCase()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

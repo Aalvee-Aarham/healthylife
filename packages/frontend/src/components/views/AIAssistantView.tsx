@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserRole } from '../../types';
-import { askGroqAI } from '../../services/groqApi';
+import { api } from '../../services/api';
+import { generateLocalFallback } from '../../services/groqApi';
 import { Sparkles, Send, User, RefreshCw, Zap } from 'lucide-react';
 
 interface AIAssistantViewProps {
@@ -43,12 +44,6 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
       '📊 Analyze client macro adherence drop and recovery suggestions',
       '📹 Form correction cues for Romanian Deadlift hip hinge',
       '💡 Nutritional audit template for high cortisol clients'
-    ],
-    admin: [
-      '⚡ Summarize platform AI token usage & latency',
-      '🛡️ Run community content safety audit check',
-      '📈 Recommend strategy to boost MRR & Coach conversions',
-      '⚙️ Server operational health and uptime status'
     ]
   };
 
@@ -69,23 +64,30 @@ export const AIAssistantView: React.FC<AIAssistantViewProps> = ({
 
     try {
       const activeRole: UserRole = (userRole as UserRole) || 'member';
-      const responseText = await askGroqAI(query, activeRole);
+      // Build conversation history (prior turns) + the new user message.
+      // System prompt persona is now owned by the backend (/ai/chat).
+      const history = messages
+        .filter((m) => m.id !== 'm_init')
+        .map((m) => ({ role: (m.sender === 'ai' ? 'assistant' : 'user') as 'assistant' | 'user', content: m.text }));
+      const { reply } = await api.aiChat([...history, { role: 'user', content: query }], activeRole);
       const aiMsg: ChatMessage = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
-        text: responseText,
+        text: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
-      console.error('AI call error:', err);
-      const errorMsg: ChatMessage = {
-        id: `err_${Date.now()}`,
+      console.warn('AI backend call failed, using offline fallback:', err);
+      const activeRole: UserRole = (userRole as UserRole) || 'member';
+      const fallbackText = generateLocalFallback(query, activeRole);
+      const aiMsg: ChatMessage = {
+        id: `ai_${Date.now()}`,
         sender: 'ai',
-        text: 'Sorry, I encountered a brief connection glitch. Please try again!',
+        text: fallbackText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
-      setMessages(prev => [...prev, errorMsg]);
+      setMessages(prev => [...prev, aiMsg]);
     } finally {
       setIsLoading(false);
     }

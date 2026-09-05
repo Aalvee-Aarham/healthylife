@@ -14,8 +14,9 @@ import {
   Activity,
   CheckCircle2
 } from 'lucide-react';
-import { GymLog } from '../../types';
+import { GymLog, GymLogParseResult } from '../../types';
 import { api } from '../../services/api';
+import { Skeleton } from '../ui/Skeleton';
 
 interface ExerciseFormItem {
   name: string;
@@ -37,10 +38,23 @@ const PRESET_WORKOUTS = [
 
 export const WorkoutsView: React.FC = () => {
   const [logs, setLogs] = useState<GymLog[]>([]);
+  const [gymStats, setGymStats] = useState({
+    totalWorkouts: 0,
+    totalSets: 0,
+    totalDurationMinutes: 0,
+    totalCaloriesBurned: 0,
+    avgSessionMinutes: 0,
+    consistentDays: [] as string[],
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // AI "Log with AI" state
+  const [aiText, setAiText] = useState<string>('');
+  const [isParsingAi, setIsParsingAi] = useState<boolean>(false);
+  const [aiParseFailed, setAiParseFailed] = useState<boolean>(false);
 
   // Form State
   const [title, setTitle] = useState<string>('');
@@ -72,8 +86,20 @@ export const WorkoutsView: React.FC = () => {
     }
   };
 
+  /** Fetch aggregate stats from backend SQL (COUNT/SUM/AVG + INTERSECT).
+   *  No JavaScript arithmetic — all numbers come from the database. */
+  const fetchStats = async () => {
+    try {
+      const data = await api.gymStats();
+      setGymStats(data);
+    } catch (err) {
+      console.error('Failed to load gym stats:', err);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
+    fetchStats();
   }, []);
 
   const showToast = (msg: string) => {
@@ -142,6 +168,50 @@ export const WorkoutsView: React.FC = () => {
     setExercises(updated);
   };
 
+  // Parse free-text workout description into a draft, and load it into the
+  // same editable exercise/set builder state used by the manual form.
+  const handleParseWithAi = async () => {
+    if (!aiText.trim()) return;
+    try {
+      setIsParsingAi(true);
+      setAiParseFailed(false);
+      const result: GymLogParseResult = await api.parseGymLog(aiText.trim());
+
+      if (!result.title && (!result.exercises || result.exercises.length === 0)) {
+        setAiParseFailed(true);
+        return;
+      }
+
+      if (result.title) {
+        setTitle(result.title);
+      }
+
+      if (result.exercises && result.exercises.length > 0) {
+        setExercises(
+          result.exercises.map((ex) => ({
+            name: ex.name || '',
+            sets:
+              ex.sets && ex.sets.length > 0
+                ? ex.sets.map((s) => ({
+                    reps: s.reps,
+                    weightKg: s.weight_kg,
+                    completed: false,
+                  }))
+                : [{ reps: 10, weightKg: 20, completed: false }],
+          }))
+        );
+      }
+
+      setIsFormOpen(true);
+      showToast('Draft ready — review and save below.');
+    } catch (err) {
+      console.error('Failed to parse workout text:', err);
+      setAiParseFailed(true);
+    } finally {
+      setIsParsingAi(false);
+    }
+  };
+
   // Submit new Gym Log
   const handleSubmitLog = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +254,7 @@ export const WorkoutsView: React.FC = () => {
       });
 
       setLogs([newLog, ...logs]);
+      fetchStats();
       showToast(`Workout "${title}" saved successfully!`);
       
       // Reset form
@@ -230,19 +301,18 @@ export const WorkoutsView: React.FC = () => {
     try {
       await api.deleteGymLog(logId);
       setLogs(logs.filter((l) => l.id !== logId));
+      // Refresh aggregate stats from backend after deletion
+      fetchStats();
       showToast('Workout log deleted.');
     } catch (err) {
       console.error('Failed to delete gym log:', err);
-      // Fallback
       setLogs(logs.filter((l) => l.id !== logId));
       showToast('Workout log removed.');
     }
   };
 
-  // Calculate live statistics from actual logs
-  const totalWorkouts = logs.length;
-  const totalSets = logs.reduce((acc, log) => acc + (log.sets?.length || 0), 0);
-  const totalDuration = logs.reduce((acc, log) => acc + (log.durationMinutes || 0), 0);
+  // Calculate live statistics from backend SQL aggregates (not JavaScript .reduce())
+  // Stats are fetched from GET /gym-logs/stats (COUNT/SUM/AVG/INTERSECT in PostgreSQL)
 
   // Group sets by exercise name helper
   const groupSetsByExercise = (sets: GymLog['sets']) => {
@@ -323,7 +393,7 @@ export const WorkoutsView: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Workouts</p>
             <h3 className="text-2xl font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
-              {totalWorkouts}
+               {gymStats.totalWorkouts}
             </h3>
           </div>
         </div>
@@ -335,7 +405,7 @@ export const WorkoutsView: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sets Logged</p>
             <h3 className="text-2xl font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
-              {totalSets}
+               {gymStats.totalSets}
             </h3>
           </div>
         </div>
@@ -347,10 +417,63 @@ export const WorkoutsView: React.FC = () => {
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Time</p>
             <h3 className="text-2xl font-extrabold" style={{ color: 'var(--hl-text-primary)' }}>
-              {totalDuration > 0 ? `${totalDuration}m` : '—'}
+               {gymStats.totalDurationMinutes > 0 ? `${gymStats.totalDurationMinutes}m` : '—'}
             </h3>
           </div>
         </div>
+      </div>
+
+      {/* Log with AI */}
+      <div className="hl-card p-5 sm:p-6 space-y-3 border-2 border-orange-200/40">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-orange-500" />
+          <h2 className="text-sm font-bold" style={{ color: 'var(--hl-text-primary)' }}>
+            Log with AI
+          </h2>
+        </div>
+        <p className="text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
+          Describe your workout in plain language and we'll draft it for you to review before saving.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={aiText}
+            onChange={(e) => setAiText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleParseWithAi();
+              }
+            }}
+            placeholder="e.g. 4x10 bench press at 60kg, 3x12 squats bodyweight"
+            disabled={isParsingAi}
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-60"
+            style={{ background: 'var(--hl-surface-alt)', borderColor: 'var(--hl-border-light)', color: 'var(--hl-text-primary)' }}
+          />
+          <button
+            type="button"
+            onClick={handleParseWithAi}
+            disabled={isParsingAi || !aiText.trim()}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{isParsingAi ? 'Parsing...' : 'Parse'}</span>
+          </button>
+        </div>
+
+        {isParsingAi && (
+          <div className="space-y-2 pt-1">
+            <Skeleton height="0.9rem" width="40%" />
+            <Skeleton height="0.7rem" width="70%" />
+            <Skeleton height="0.7rem" width="55%" />
+          </div>
+        )}
+
+        {!isParsingAi && aiParseFailed && (
+          <div className="text-xs px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-medium">
+            Couldn't understand that workout description. Try rephrasing it, or use the manual entry form below.
+          </div>
+        )}
       </div>
 
       {/* Log Workout Form (Collapsible / Active) */}
@@ -647,9 +770,16 @@ export const WorkoutsView: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="hl-card p-12 text-center space-y-3">
-            <div className="w-8 h-8 rounded-full border-4 border-orange-400 border-t-transparent animate-spin mx-auto" />
-            <p className="text-sm font-semibold text-slate-400">Loading workout logs...</p>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="hl-card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton height="0.9rem" width="35%" />
+                  <Skeleton height="0.7rem" width="15%" />
+                </div>
+                <Skeleton height="0.7rem" width="60%" />
+              </div>
+            ))}
           </div>
         ) : logs.length === 0 ? (
           <div className="hl-card p-12 text-center space-y-4">

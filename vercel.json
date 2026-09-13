@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "packages/frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
+    },
+    {
+      "src": "api/index.php",
+      "use": "vercel-php@0.6.2",
+      "config": {
+        "excludeFiles": [
+          "vercel.json",
+          ".vercelignore",
+          "node_modules/**",
+          "packages/frontend/**",
+          "packages/database/**",
+          "packages/backend/node_modules/**",
+          "packages/backend/tests/**",
+          "packages/backend/storage/framework/**",
+          "packages/backend/storage/logs/**",
+          "packages/backend/.env",
+          "packages/backend/.env.*"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.php" },
+    { "src": "/(.+\\.[^/]+)$", "dest": "/packages/frontend/$1" },
+    { "src": "/(.*)", "dest": "/packages/frontend/index.html" }
+  ]
+}

@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/vendor
+dist
+**/dist
+.git
+.env
+.env.*
+!.env.example
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/storage/logs/*
+**/bootstrap/cache/*
+.vercel
+.vscode

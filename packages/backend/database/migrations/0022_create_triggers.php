@@ -28,5 +28,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        DB::unprepared('
+            DROP TRIGGER IF EXISTS trg_plans_archive_previous ON plans;
+            DROP FUNCTION IF EXISTS fn_archive_previous_plans;
+        ');
     }
 };

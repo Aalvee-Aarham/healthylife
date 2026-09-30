@@ -49,15 +49,21 @@ class CoachService
         );
         abort_unless($coach, 404, 'Coach not found');
 
-        // Procedure: sp_assign_coach swaps out the old assignment for this specialty.
-        $assignmentId = DB::selectOne(
-            'CALL sp_assign_coach(?, ?, ?, NULL)',
-            [$memberId, $coachId, $specialty]
-        )->p_assignment_id;
+        // Transaction: the new assignment and its conversation are saved together,
+        // so a failure never leaves the member with their old coach deleted and no new one.
+        $assignmentId = DB::transaction(function () use ($memberId, $coachId, $specialty, $coach) {
+            // Procedure: sp_assign_coach swaps out the old assignment for this specialty.
+            $assignmentId = DB::selectOne(
+                'CALL sp_assign_coach(?, ?, ?, NULL)',
+                [$memberId, $coachId, $specialty]
+            )->p_assignment_id;
 
-        $member = DB::selectOne('SELECT name FROM users WHERE id = ?', [$memberId]);
+            $member = DB::selectOne('SELECT name FROM users WHERE id = ?', [$memberId]);
 
-        $this->startConversation($memberId, $coachId, $member->name ?? 'there', $coach->coach_specialty);
+            $this->startConversation($memberId, $coachId, $member->name ?? 'there', $coach->coach_specialty);
+
+            return $assignmentId;
+        });
 
         return [
             'id' => (string) $assignmentId,

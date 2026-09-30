@@ -1,6 +1,8 @@
 # HealthyLife — Holistic Health, Fitness & Coaching Platform
 
-A full-stack holistic wellness platform built with React, TypeScript, and Vite. HealthyLife combines AI-powered nutrition tracking, workout planning, cycle syncing, community engagement, and multi-role portals for members, coaches, and admins.
+A full-stack holistic wellness platform: a React + Vite frontend on a Laravel + PostgreSQL API. HealthyLife combines AI-powered nutrition tracking, workout planning, cycle syncing, and multi-role portals for members and coaches.
+
+**Live:** https://web-production-8d9bf4.up.railway.app
 
 ---
 
@@ -10,58 +12,93 @@ A full-stack holistic wellness platform built with React, TypeScript, and Vite. 
 - **Macro & Water Tracker** — Visual progress rings for Calories, Protein, Carbs, Fats, and hydration.
 - **Workouts & Sculpt** — Daily training schedules with muscle group targeting and PR logging.
 - **CycleSync™** — 28-day biological phase tracker with symptom logging and phase-specific recommendations.
-- **Community Feed** — Social posts, likes, comments, and streak challenges.
-- **AI Health Advisor** — Powered by Groq/Llama-3.3-70b with role-tailored prompts and guest access.
-- **Coach Portal** — Client roster, compliance meters, consultation scheduler, and AI workout plan generator.
-- **Admin Dashboard** — Platform KPIs, user role management, and AI telemetry analyzer.
+- **AI Health Advisor** — Groq (Llama-3.3-70b) or Gemini, switchable via `AI_PROVIDER`.
+- **Coach Portal** — Client roster, chat, plans, and AI workout plan generator.
+- **Auth** — Email/password or Google sign-in (Firebase), backed by Laravel Sanctum tokens.
 - **Light / Dark Mode** — Full Organic Tech design system with glassmorphic UI.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React 19, TypeScript, Vite
-- **Styling:** Tailwind CSS v4
-- **AI:** Groq API (Llama-3.3-70b)
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Motion, Lucide
+- **Backend:** Laravel 12 (PHP 8.2), Sanctum
+- **Database:** PostgreSQL 16 (views, procedures, and triggers live in migrations)
+- **Auth:** Firebase Authentication (Google) + Sanctum
+- **AI:** Groq / Gemini
 - **Images:** Pexels API
-- **Icons:** Lucide React
-- **Animation:** Motion
+- **Hosting:** Railway
 
 ---
 
-## ⚙️ Getting Started
+## 📁 Structure
 
-### Prerequisites
-- Node.js 18+
+```
+packages/
+  frontend/   React SPA (calls the API at relative /api)
+  backend/    Laravel API
+Dockerfile    Production image: builds the SPA into Laravel's public/ (Railway)
+docker-compose.yml   Local dev stack: Postgres + backend + frontend
+```
 
-### Installation
+---
+
+## ⚙️ Run Locally
+
+### Option A — Docker (recommended)
 
 ```bash
-git clone https://github.com/Aalvee-Aarham/healthylife.git
-cd healthylife
+cp docker.env.example .env      # add GROQ_API_KEY / GEMINI_API_KEY
+docker compose up --build
+```
+
+Frontend at `http://localhost:3000`, API at `http://localhost:8000`. Migrations run automatically.
+
+### Option B — Native
+
+Requires Node 20+, PHP 8.2+ (with `pdo_pgsql`), Composer, and PostgreSQL.
+
+```bash
 npm install
+cd packages/backend
+composer install
+cp .env.example .env            # set DB_* and AI keys
+php artisan key:generate
+php artisan migrate
+cd ../..
+npm run dev                     # starts backend (:8000) and frontend (:3000)
 ```
 
 ### Environment Variables
 
-Copy `.env.example` and fill in your API keys:
+| Variable | Where | Purpose |
+|----------|-------|---------|
+| `APP_KEY` | backend | Laravel encryption key |
+| `DB_URL` or `DB_HOST`/`DB_PORT`/`DB_DATABASE`/`DB_USERNAME`/`DB_PASSWORD` | backend | PostgreSQL connection |
+| `AI_PROVIDER` | backend | `groq` or `gemini` |
+| `GROQ_API_KEY` / `GEMINI_API_KEY` / `GEMINI_MODEL` | backend | AI provider credentials |
+| `FIREBASE_API_KEY` | backend | Optional — defaults to the project's public web key; used to verify Firebase ID tokens |
+| `VITE_PEXELS_API_KEY` | frontend (build time) | Food/workout images |
+
+---
+
+## 🚢 Deployment (Railway)
+
+The Railway project `healthylife` has two services:
+
+- **`web`** — built from the root `Dockerfile`. One container serves both the API (`/api/*`) and the SPA (everything else). Migrations run on each boot.
+- **`Postgres`** — Railway Postgres; `web` connects via `DB_URL=${{Postgres.DATABASE_URL}}`.
+
+Deploy from your machine:
 
 ```bash
-cp .env.example .env
+railway link          # select the healthylife project
+railway up --service web
 ```
 
-```env
-VITE_GROQ_API_KEY=your_groq_api_key
-VITE_PEXELS_API_KEY=your_pexels_api_key
-```
+`web` service variables: `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `DB_CONNECTION=pgsql`, `DB_URL`, `QUEUE_CONNECTION=sync`, `SESSION_DRIVER=file`, `CACHE_STORE=file`, `LOG_CHANNEL=stderr`, the AI keys above, and `VITE_PEXELS_API_KEY` (passed to the frontend build).
 
-### Run Locally
-
-```bash
-npm run dev
-```
-
-App runs at `http://localhost:3000`
+**Firebase:** any new domain (e.g. a custom domain) must be added under Firebase console → Authentication → Settings → Authorized domains, or Google sign-in fails with `auth/unauthorized-domain`.
 
 ---
 

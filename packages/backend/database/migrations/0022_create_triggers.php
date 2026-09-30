@@ -24,12 +24,35 @@ return new class extends Migration
             BEFORE INSERT ON plans
             FOR EACH ROW EXECUTE FUNCTION fn_archive_previous_plans();
         ");
+
+        // Deleting a meal / gym log that was auto-logged from a plan item un-checks that item.
+        // BEFORE DELETE: the FK's ON DELETE SET NULL would otherwise clear the link first.
+        DB::unprepared("
+            CREATE OR REPLACE FUNCTION fn_uncheck_plan_item() RETURNS TRIGGER
+            LANGUAGE plpgsql AS \$\$
+            BEGIN
+                IF TG_TABLE_NAME = 'meals' THEN
+                    UPDATE plan_completions SET completed_at = NULL, meal_id = NULL, updated_at = NOW()
+                    WHERE meal_id = OLD.id;
+                ELSE
+                    UPDATE plan_completions SET completed_at = NULL, gym_log_id = NULL, updated_at = NOW()
+                    WHERE gym_log_id = OLD.id;
+                END IF;
+                RETURN OLD;
+            END \$\$;
+
+            CREATE TRIGGER trg_gym_logs_uncheck_plan_item
+            BEFORE DELETE ON gym_logs
+            FOR EACH ROW EXECUTE FUNCTION fn_uncheck_plan_item();
+        ");
     }
 
     public function down(): void
     {
         DB::unprepared('
+            DROP TRIGGER IF EXISTS trg_gym_logs_uncheck_plan_item ON gym_logs;
             DROP TRIGGER IF EXISTS trg_plans_archive_previous ON plans;
+            DROP FUNCTION IF EXISTS fn_uncheck_plan_item;
             DROP FUNCTION IF EXISTS fn_archive_previous_plans;
         ');
     }

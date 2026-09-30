@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 COPY packages/frontend/package.json packages/frontend/package.json
 RUN npm install --workspace @healthy-life/frontend
 COPY packages/frontend packages/frontend
+# Railway passes service variables with matching names as build args
+ARG VITE_PEXELS_API_KEY
 RUN npm run build --workspace @healthy-life/frontend
 
 FROM php:8.2-cli
@@ -17,8 +19,9 @@ COPY packages/backend/composer.json packages/backend/composer.lock ./
 RUN composer install --no-dev --no-interaction --no-scripts --no-autoloader --prefer-dist
 COPY packages/backend .
 COPY --from=web /app/packages/frontend/dist public/
-RUN composer dump-autoload --optimize && chmod +x docker-entrypoint.sh
+RUN mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
+    && composer dump-autoload --optimize && chmod +x docker-entrypoint.sh
 # ponytail: artisan serve w/ 4 workers; swap to FrankenPHP/nginx+fpm if traffic grows
 ENV PHP_CLI_SERVER_WORKERS=4
 ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000} --no-reload"]

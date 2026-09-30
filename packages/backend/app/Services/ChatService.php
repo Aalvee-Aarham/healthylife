@@ -212,9 +212,11 @@ class ChatService
             $rows = DB::select(
                 "SELECT DISTINCT u.id, u.name, u.avatar, u.email,
                         COALESCE(ca.specialty, ?) AS specialty,
-                        COALESCE(ca.notes, '')     AS notes
+                        COALESCE(ca.notes, '')     AS notes,
+                        a.planned_items, a.adherence_pct, a.last_active_at
                  FROM users u
                  LEFT JOIN coach_assignments ca ON ca.member_id = u.id AND ca.coach_id = ?
+                 JOIN v_client_adherence a ON a.member_id = u.id
                  WHERE u.id IN (
                      SELECT member_id FROM coach_assignments WHERE coach_id = ?
                      UNION

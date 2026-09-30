@@ -7,6 +7,30 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Per-user, per-day intake: meals (completed only) + water, via UNION ALL then SUM/COUNT.
+        // Used by DashboardService::summary().
+        DB::unprepared("
+            CREATE OR REPLACE VIEW v_daily_intake AS
+            SELECT
+                user_id,
+                day,
+                SUM(calories)    AS calories,
+                SUM(protein)     AS protein,
+                SUM(carbs)       AS carbs,
+                SUM(fat)         AS fat,
+                COUNT(meal_id)   AS meal_count,
+                SUM(water_ml)    AS water_ml
+            FROM (
+                SELECT user_id, logged_at::date AS day, id AS meal_id, calories, protein, carbs, fat, 0 AS water_ml
+                FROM meals
+                WHERE completed = true
+                UNION ALL
+                SELECT user_id, logged_at::date, NULL, 0, 0, 0, 0, amount_ml
+                FROM water_logs
+            ) intake
+            GROUP BY user_id, day
+        ");
+
         // Each gym log with its sets folded into JSON (LEFT JOIN + JSON_AGG).
         // Used by GymLogService::index/store/toggleSet.
         DB::unprepared("
@@ -61,6 +85,7 @@ return new class extends Migration
         DB::unprepared('
             DROP VIEW IF EXISTS v_workout_stats;
             DROP VIEW IF EXISTS v_gym_logs_with_sets;
+            DROP VIEW IF EXISTS v_daily_intake;
         ');
     }
 };

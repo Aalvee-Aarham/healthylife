@@ -6,7 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
-PROJECT_BREAKDOWN.md
 metadata.json
 **/backend/vendor/
 **/backend/storage/*.key
@@ -17,5 +16,7 @@ metadata.json
 **/backend/bootstrap/cache/*
 .vercel
 .vscode/
-CHANGES.md
 
+*.md
+!README.md
+*.docx

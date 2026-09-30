@@ -61,6 +61,7 @@ return new class extends Migration
     public function down(): void
     {
         DB::unprepared('
+            DROP PROCEDURE IF EXISTS sp_assign_coach;
             DROP PROCEDURE IF EXISTS sp_log_workout;
         ');
     }

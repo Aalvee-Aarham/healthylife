@@ -33,6 +33,50 @@ class PlanService
     }
 
     /**
+     * Recently archived plans (the member's plan history), newest first.
+     */
+    public function history(int $memberId, int $limit = 5): array
+    {
+        $rows = DB::select(
+            "SELECT id, member_id, created_by, coach_id, type, title, status, week_start_date, content, updated_at
+             FROM plans
+             WHERE member_id = ? AND status = 'archived'
+             ORDER BY updated_at DESC
+             LIMIT ?",
+            [$memberId, $limit]
+        );
+
+        return array_map(fn ($p) => $this->format($p), $rows);
+    }
+
+    /**
+     * Member id of a plan (404 if missing) — used for authorization before archiving.
+     */
+    public function memberIdOf(int $planId): int
+    {
+        $plan = DB::selectOne('SELECT member_id FROM plans WHERE id = ?', [$planId]);
+        abort_unless($plan, 404);
+
+        return (int) $plan->member_id;
+    }
+
+    /**
+     * PATCH /plans/{id}/archive — end a plan early. Completions stay for history.
+     */
+    public function archive(int $planId): void
+    {
+        DB::update("UPDATE plans SET status = 'archived', updated_at = NOW() WHERE id = ?", [$planId]);
+    }
+
+    /**
+     * POST /plans/draft — AI-generated plan content for a coach to edit; nothing is saved.
+     */
+    public function draft(User $member, string $type): array
+    {
+        return $this->aiService->generateWeeklyPlan($this->memberContext($member), $type);
+    }
+
+    /**
      * POST /plans — coach-authored plan.
      */
     public function store(int $coachId, string $createdBy, array $data): array
@@ -60,6 +104,28 @@ class PlanService
      */
     public function generateAiPlan(User $member, string $type): array
     {
+        $generated = $this->aiService->generateWeeklyPlan($this->memberContext($member), $type);
+
+        $weekStart = now()->startOfWeek()->toDateString();
+
+        $rows = DB::select(
+            "INSERT INTO plans (member_id, created_by, coach_id, type, title, status, week_start_date, content, created_at, updated_at)
+             VALUES (?, 'ai', NULL, ?, ?, 'active', ?, ?, NOW(), NOW())
+             RETURNING *",
+            [
+                $member->id,
+                $type,
+                $generated['title'] ?? (ucfirst($type).' Plan'),
+                $weekStart,
+                json_encode($generated),
+            ]
+        );
+
+        return $this->format($rows[0]);
+    }
+
+    private function memberContext(User $member): array
+    {
         $context = [
             'goal' => $member->goal,
             'activityLevel' => $member->activity_level,
@@ -78,24 +144,7 @@ class PlanService
             $context['cyclePhase'] = $this->cycleService->currentPhase($member->id);
         }
 
-        $generated = $this->aiService->generateWeeklyPlan($context, $type);
-
-        $weekStart = now()->startOfWeek()->toDateString();
-
-        $rows = DB::select(
-            "INSERT INTO plans (member_id, created_by, coach_id, type, title, status, week_start_date, content, created_at, updated_at)
-             VALUES (?, 'ai', NULL, ?, ?, 'active', ?, ?, NOW(), NOW())
-             RETURNING *",
-            [
-                $member->id,
-                $type,
-                $generated['title'] ?? (ucfirst($type).' Plan'),
-                $weekStart,
-                json_encode($generated),
-            ]
-        );
-
-        return $this->format($rows[0]);
+        return $context;
     }
 
     /**

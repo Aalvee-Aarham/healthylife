@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavigationTab } from '../../types';
+import { api } from '../../services/api';
 import {
   Sparkles,
   ArrowRight,
@@ -354,7 +355,6 @@ const HEADLINE_LINE_TWO = ['Empowered', 'by', 'HealthyLife', 'AI.'];
 /* ------------------------------------------------------------------ */
 
 export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAuthModal }) => {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const [heroPrompt, setHeroPrompt] = useState('Create a 15-min Ovulation Peak energizing workout');
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -403,11 +403,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
 
   const bleed: React.CSSProperties = { marginInline: 'calc(50% - 50vw)' };
 
+  const [counts, setCounts] = useState<Awaited<ReturnType<typeof api.publicStats>> | null>(null);
+  useEffect(() => { api.publicStats().then(setCounts).catch(() => {}); }, []);
+  const fmt = (n?: number) => (n === undefined ? '—' : n.toLocaleString('en-US'));
+
   const stats = [
-    { label: 'Active Members in BD', value: '14,280+', icon: User },
-    { label: 'AI Bio-Plans Generated', value: '142,980+', icon: Bot },
-    { label: 'CycleSync™ Accuracy', value: '99.4%', icon: HeartPulse },
-    { label: 'Certified Local Coaches', value: '184+', icon: Briefcase },
+    { label: 'Active Members in BD', value: fmt(counts?.members), icon: User },
+    { label: 'AI Bio-Plans Generated', value: fmt(counts?.ai_plans), icon: Bot },
+    { label: 'Cycles Tracked', value: fmt(counts?.cycles), icon: HeartPulse },
+    { label: 'Certified Local Coaches', value: fmt(counts?.coaches), icon: Briefcase },
   ];
 
   const marqueeItems = [
@@ -1297,180 +1301,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
               </figure>
             </Reveal>
           ))}
-        </div>
-      </section>
-
-      {/* ====================== PRICING ====================== */}
-      <section className="max-w-6xl mx-auto pt-20 sm:pt-28">
-        <Reveal className="text-center space-y-3 mb-10">
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight" style={{ color: 'var(--hl-text-primary)' }}>
-            HealthyLife transparent pricing
-          </h2>
-          <p className="text-sm" style={{ color: 'var(--hl-text-secondary)' }}>
-            Select the perfect plan for individual wellness or coaching businesses.
-          </p>
-
-          <div
-            role="group"
-            aria-label="Billing cycle"
-            className="relative inline-flex items-center gap-2 p-1.5 rounded-full mt-3"
-            style={{ background: 'var(--hl-surface-alt)', border: '1px solid var(--hl-border)' }}
-          >
-            <span
-              aria-hidden="true"
-              className="absolute top-1.5 bottom-1.5 rounded-full"
-              style={{
-                left: billingCycle === 'monthly' ? '0.375rem' : 'calc(50% + 0.125rem)',
-                width: 'calc(50% - 0.5rem)',
-                background: 'var(--hl-green)',
-                boxShadow: '0 4px 14px rgba(61,122,90,.3)',
-                transition: 'left .42s cubic-bezier(.22,1,.36,1)',
-              }}
-            />
-            <button
-              onClick={() => setBillingCycle('monthly')}
-              aria-pressed={billingCycle === 'monthly'}
-              className="relative z-[1] px-5 py-1.5 rounded-full text-xs font-bold"
-              style={{
-                color: billingCycle === 'monthly' ? 'var(--hl-text-inverse)' : 'var(--hl-text-secondary)',
-                transition: 'color .3s ease',
-              }}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setBillingCycle('yearly')}
-              aria-pressed={billingCycle === 'yearly'}
-              className="relative z-[1] px-5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5"
-              style={{
-                color: billingCycle === 'yearly' ? 'var(--hl-text-inverse)' : 'var(--hl-text-secondary)',
-                transition: 'color .3s ease',
-              }}
-            >
-              <span>Yearly</span>
-            </button>
-          </div>
-        </Reveal>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-
-          {/* Free */}
-          <Reveal variant="scale">
-            <div className="hl-card hl-tilt p-8 space-y-6 flex flex-col justify-between h-full">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold" style={{ color: 'var(--hl-text-primary)' }}>Free Tier</h3>
-                  <p className="text-xs mt-1" style={{ color: 'var(--hl-text-tertiary)' }}>Basic macro &amp; workout logging.</p>
-                  <div className="mt-4">
-                    <span className="text-4xl font-black" style={{ color: 'var(--hl-text-primary)' }}>৳0</span>
-                    <span className="text-xs" style={{ color: 'var(--hl-text-tertiary)' }}> / forever</span>
-                  </div>
-                </div>
-                <ul className="space-y-3 text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
-                  {['Daily Calorie & Macro Logging', 'Standard Workout Routines', 'Community Access'].map(f => (
-                    <li key={f} className="hl-plan-row flex items-center gap-2 rounded-lg">
-                      <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--hl-green)' }} aria-hidden="true" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => onSelectTab('signup')}
-                className="hl-btn-ghost hl-cta-lift w-full py-3 text-xs"
-                style={{ background: 'var(--hl-surface-alt)' }}
-              >
-                Start Free
-              </button>
-            </div>
-          </Reveal>
-
-          {/* Vitality Plus */}
-          <Reveal variant="scale" delay={110}>
-            <div
-              className="hl-tilt p-8 rounded-3xl space-y-6 relative flex flex-col justify-between h-full md:-mt-4 md:mb-4"
-              style={{ background: 'var(--hl-surface)', border: '2px solid var(--hl-green)', boxShadow: 'var(--hl-shadow-xl)' }}
-            >
-              <div
-                className="absolute -top-3.5 right-6 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
-                style={{ background: 'var(--hl-green)', color: 'var(--hl-text-inverse)', boxShadow: '0 6px 16px rgba(61,122,90,.35)' }}
-              >
-                Most Popular
-              </div>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold" style={{ color: 'var(--hl-green)' }}>Vitality Plus</h3>
-                  <p className="text-xs mt-1" style={{ color: 'var(--hl-text-tertiary)' }}>Full CycleSync™ &amp; AI Assistant.</p>
-                  <div className="mt-4 flex items-baseline gap-1">
-                    <span
-                      key={billingCycle}
-                      className="text-4xl font-black animate-fade-slide-up"
-                      style={{ color: 'var(--hl-text-primary)' }}
-                    >
-                      {billingCycle === 'yearly' ? '৳200' : '৳250'}
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--hl-text-tertiary)' }}> / month</span>
-                  </div>
-                </div>
-                <ul className="space-y-3 text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
-                  {[
-                    'CycleSync™ Biological Intelligence',
-                    'Advanced Llama-3.3-70b AI Advisor',
-                    'Custom Macro & Meal Generator',
-                    'Unlimited PR Logs',
-                  ].map(f => (
-                    <li key={f} className="hl-plan-row flex items-center gap-2 rounded-lg">
-                      <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--hl-green)' }} aria-hidden="true" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => onSelectTab('signup')}
-                className="hl-btn-primary hl-cta-lift hl-sheen w-full py-3 text-xs"
-              >
-                Start 14-Day Free Trial
-              </button>
-            </div>
-          </Reveal>
-
-          {/* Pro Coach */}
-          <Reveal variant="scale" delay={220}>
-            <div className="hl-card hl-tilt p-8 space-y-6 flex flex-col justify-between h-full">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold" style={{ color: 'var(--hl-text-primary)' }}>Pro Coach Studio</h3>
-                  <p className="text-xs mt-1" style={{ color: 'var(--hl-text-tertiary)' }}>For trainers &amp; nutrition coaches.</p>
-                  <div className="mt-4">
-                    <span
-                      key={billingCycle}
-                      className="text-4xl font-black animate-fade-slide-up"
-                      style={{ color: 'var(--hl-text-primary)' }}
-                    >
-                      {billingCycle === 'yearly' ? '৳500' : '৳600'}
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--hl-text-tertiary)' }}> / month</span>
-                  </div>
-                </div>
-                <ul className="space-y-3 text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
-                  {['Client Roster & Compliance Tools', 'AI Client Routine Generator', 'Live Consultation Queue'].map(f => (
-                    <li key={f} className="hl-plan-row flex items-center gap-2 rounded-lg">
-                      <Check className="w-4 h-4 shrink-0" style={{ color: 'var(--hl-green)' }} aria-hidden="true" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => onSelectTab('signin')}
-                className="hl-btn-ghost hl-cta-lift w-full py-3 text-xs"
-                style={{ background: 'var(--hl-surface-alt)' }}
-              >
-                Sign In as Coach
-              </button>
-            </div>
-          </Reveal>
         </div>
       </section>
 

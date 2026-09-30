@@ -9,7 +9,6 @@ import {
   LogOut,
   ChevronDown,
   LayoutDashboard,
-  MessageSquare,
   ArrowRight,
   Lock,
 } from 'lucide-react';
@@ -104,9 +103,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Logged-in nav
   const loggedInNav: NavItem[] = [
     {
-      id: user?.role === 'coach' ? 'chat' : 'dashboard',
-      label: user?.role === 'coach' ? 'Client Chat' : 'Dashboard',
-      icon: user?.role === 'coach' ? MessageSquare : LayoutDashboard
+      id: user?.role === 'coach' ? 'coach-dashboard' : 'dashboard',
+      label: user?.role === 'coach' ? 'Overview' : 'Dashboard',
+      icon: LayoutDashboard
     }
   ];
 
@@ -204,7 +203,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Logo & Brand */}
           <button
-            onClick={() => go(isLoggedIn && user ? (user.role === 'coach' ? 'chat' : 'dashboard') : 'home')}
+            onClick={() => go(isLoggedIn && user ? (user.role === 'coach' ? 'coach-dashboard' : 'dashboard') : 'home')}
             className="hl-brand flex items-center gap-2.5 focus:outline-none rounded-2xl"
             aria-label="HealthyLife home"
           >
@@ -382,23 +381,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="space-y-1">
                       <button
                         role="menuitem"
-                        onClick={() => go(user.role === 'coach' ? 'chat' : 'dashboard')}
+                        onClick={() => go(user.role === 'coach' ? 'coach-dashboard' : 'dashboard')}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-left transition-colors"
                         style={{ color: 'var(--hl-text-secondary)' }}
                         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--hl-surface-alt)'; }}
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
-                        {user.role === 'coach' ? (
-                          <>
-                            <MessageSquare className="w-4 h-4" style={{ color: 'var(--hl-green)' }} aria-hidden="true" />
-                            <span>Client Chat</span>
-                          </>
-                        ) : (
-                          <>
-                            <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--hl-green)' }} aria-hidden="true" />
-                            <span>Dashboard</span>
-                          </>
-                        )}
+                        <LayoutDashboard className="w-4 h-4" style={{ color: 'var(--hl-green)' }} aria-hidden="true" />
+                        <span>{user.role === 'coach' ? 'Coach Overview' : 'Dashboard'}</span>
                       </button>
 
                       <button

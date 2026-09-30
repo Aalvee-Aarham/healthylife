@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Services\CoachService;
 use App\Services\PlanService;
 use Illuminate\Http\Request;
 
 class PlanController extends Controller
 {
-    public function __construct(private readonly PlanService $planService) {}
+    public function __construct(
+        private readonly PlanService $planService,
+        private readonly CoachService $coachService,
+    ) {}
 
     /**
      * GET /plans — member's own active plans, or ?member_id= for a coach viewing a client's plan.
@@ -19,6 +24,7 @@ class PlanController extends Controller
         if ($user->isCoach()) {
             $request->validate(['member_id' => 'required|exists:users,id']);
             $memberId = (int) $request->query('member_id');
+            $this->coachService->assertCoachOf($user->id, $memberId);
         } else {
             $memberId = $user->id;
         }
@@ -27,7 +33,7 @@ class PlanController extends Controller
     }
 
     /**
-     * POST /plans — coach-authored plan.
+     * POST /plans — coach-authored plan. The DB trigger archives the client's previous active plan of this type.
      */
     public function store(Request $request)
     {
@@ -42,9 +48,48 @@ class PlanController extends Controller
             'content' => 'required|array',
         ]);
 
+        $this->coachService->assertCoachOf($user->id, (int) $data['member_id']);
+
         $createdBy = $user->coach_specialty === 'nutritionist' ? 'nutritionist' : 'trainer';
 
         return response()->json($this->planService->store($user->id, $createdBy, $data), 201);
+    }
+
+    /**
+     * POST /plans/draft — coach asks the AI for a starting plan for a client (not saved).
+     */
+    public function draft(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user->isCoach(), 403);
+
+        $data = $request->validate([
+            'member_id' => 'required|exists:users,id',
+            'type' => 'required|in:nutrition,workout',
+        ]);
+
+        $this->coachService->assertCoachOf($user->id, (int) $data['member_id']);
+
+        return response()->json($this->planService->draft(User::findOrFail($data['member_id']), $data['type']));
+    }
+
+    /**
+     * PATCH /plans/{id}/archive — the member or one of their coaches ends a plan.
+     */
+    public function archive(Request $request, int $plan)
+    {
+        $user = $request->user();
+        $memberId = $this->planService->memberIdOf($plan);
+
+        if ($user->isCoach()) {
+            $this->coachService->assertCoachOf($user->id, $memberId);
+        } else {
+            abort_unless($memberId === $user->id, 403);
+        }
+
+        $this->planService->archive($plan);
+
+        return response()->json(['success' => true]);
     }
 
     /**

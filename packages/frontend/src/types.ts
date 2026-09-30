@@ -181,6 +181,45 @@ export interface ClientRecord {
   notes: string;
 }
 
+export interface DailyIntake {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  mealCount: number;
+  waterMl: number;
+}
+
+/** GET /coach/clients/{id} — everything a coach needs to monitor one client. */
+export interface ClientDetail {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  gender?: string | null;
+  age: number | null;
+  heightCm: number | null;
+  weightCurrentKg: number | null;
+  weightTargetKg: number | null;
+  goal: string | null;
+  activityLevel: string | null;
+  bodyType: string | null;
+  medicalConditions: string | null;
+  goals: { calories: number | null; protein: number | null; carbs: number | null; fat: number | null; waterMl: number | null };
+  plannedItems: number;
+  completedItems: number;
+  adherencePercent: number;
+  lastActive: string;
+  /** False when the client only has a conversation with this coach (notes can't be saved). */
+  assigned: boolean;
+  notes: string;
+  intake: DailyIntake[];
+  plans: Plan[];
+  planHistory: Plan[];
+  recentWorkouts: GymLog[];
+}
+
 export interface CoachSession {
   id: string;
   clientName: string;

@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. Seed Trainer Coach
-        $trainer = DB::selectOne("SELECT id FROM users WHERE coach_specialty = 'trainer' AND role = 'coach'");
+        $trainer = DB::selectOne("SELECT id FROM users WHERE email = 'coach@demo.com'");
         if (!$trainer) {
             $tRows = DB::select(
                 "INSERT INTO users (name, email, password, role, gender, avatar, coach_specialty, title, created_at, updated_at)
@@ -21,8 +21,8 @@ class DatabaseSeeder extends Seeder
                  RETURNING id",
                 [
                     'Alex Rivera, CSCS',
-                    'coach@healthylife.com',
-                    Hash::make('password123'),
+                    'coach@demo.com',
+                    Hash::make('password'),
                     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
                     'Master Strength Coach & Biometrics Specialist'
                 ]
@@ -33,7 +33,7 @@ class DatabaseSeeder extends Seeder
         }
 
         // 2. Seed Nutritionist Coach
-        $nutritionist = DB::selectOne("SELECT id FROM users WHERE coach_specialty = 'nutritionist' AND role = 'coach'");
+        $nutritionist = DB::selectOne("SELECT id FROM users WHERE email = 'nutri@demo.com'");
         if (!$nutritionist) {
             $nRows = DB::select(
                 "INSERT INTO users (name, email, password, role, gender, avatar, coach_specialty, title, created_at, updated_at)
@@ -41,8 +41,8 @@ class DatabaseSeeder extends Seeder
                  RETURNING id",
                 [
                     'Dr. Elena Chen',
-                    'nutritionist@healthylife.com',
-                    Hash::make('password123'),
+                    'nutri@demo.com',
+                    Hash::make('password'),
                     'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
                     'Clinical Nutritionist & Metabolic Specialist'
                 ]
@@ -52,8 +52,8 @@ class DatabaseSeeder extends Seeder
             $nutritionistId = $nutritionist->id;
         }
 
-        // 3. Seed default demo member: member@healthylife.com
-        $member = DB::selectOne("SELECT id FROM users WHERE email = 'member@healthylife.com'");
+        // 3. Seed default demo member: user@demo.com
+        $member = DB::selectOne("SELECT id FROM users WHERE email = 'user@demo.com'");
         if (!$member) {
             $mRows = DB::select(
                 "INSERT INTO users 
@@ -64,8 +64,8 @@ class DatabaseSeeder extends Seeder
                  RETURNING id",
                 [
                     'Maya Lin',
-                    'member@healthylife.com',
-                    Hash::make('password123'),
+                    'user@demo.com',
+                    Hash::make('password'),
                     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
                     'Cycle Alignment & Metabolic Health',
                     'moderate',
@@ -105,7 +105,7 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // 5. Seed Realistic Historical Cycle Data for member@healthylife.com
+        // 5. Seed Realistic Historical Cycle Data for user@demo.com
         // Clean existing cycle data for clean seed
         DB::statement("DELETE FROM cycle_periods WHERE user_id = ?", [$memberId]);
         DB::statement("DELETE FROM cycle_symptom_logs WHERE user_id = ?", [$memberId]);
@@ -178,7 +178,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 6. Seed today's and recent days' meals for member@healthylife.com
+        // 6. Seed today's and recent days' meals for user@demo.com
         DB::statement("DELETE FROM meals WHERE user_id = ?", [$memberId]);
         
         $mealsToSeed = [
@@ -294,7 +294,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 7. Seed Weekly Meal Plans for member@healthylife.com
+        // 7. Seed Weekly Meal Plans for user@demo.com
         DB::statement("DELETE FROM meal_plans WHERE user_id = ?", [$memberId]);
 
         $mealPlansToSeed = [

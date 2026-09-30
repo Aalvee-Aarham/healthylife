@@ -30,9 +30,14 @@ export const Header: React.FC<HeaderProps> = ({
       case 'ai-assistant':
         return { title: 'AI Health Advisor', subtitle: 'Clinical AI intelligence & custom wellness plans' };
       case 'coach-dashboard':
+        return { title: 'Coach Overview', subtitle: 'Client adherence, alerts & quick actions' };
       case 'clients':
+        return { title: 'My Clients', subtitle: 'Monitor intake, workouts & plan progress' };
       case 'consultations':
+        return { title: 'Plan Builder', subtitle: 'Create and manage weekly client plans' };
       case 'plan-builder':
+        if (user.role !== 'coach') return { title: 'My Plans', subtitle: 'Your weekly nutrition & workout plans' };
+        return { title: 'Plan Builder', subtitle: 'Create and manage weekly client plans' };
       case 'chat':
         return user.role === 'coach'
           ? { title: 'Client Chat', subtitle: 'Direct 1-on-1 consultations & real-time messaging' }

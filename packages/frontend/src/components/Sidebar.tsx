@@ -89,6 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'COACHING',
       items: [
+        { id: 'coach-dashboard', label: 'Overview', icon: LayoutDashboard, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
         { id: 'clients', label: 'My Clients', icon: Users, color: 'var(--hl-teal)', bgLight: 'var(--hl-teal-light)', borderLight: 'var(--hl-teal-border)' },
         { id: 'chat', label: 'Client Chat', icon: MessageSquare, color: 'var(--hl-green)', bgLight: 'var(--hl-green-light)', borderLight: 'var(--hl-green-border)' },
         { id: 'consultations', label: 'Plan Builder', icon: FileText, color: 'var(--hl-lavender)', bgLight: 'var(--hl-lavender-light)', borderLight: 'var(--hl-lavender-border)' },

@@ -128,7 +128,7 @@ export default function App() {
     } else if (targetTab) {
       setCurrentTab(targetTab);
     } else if (profile.role === 'coach') {
-      setCurrentTab('chat');
+      setCurrentTab('coach-dashboard');
     } else {
       setCurrentTab('dashboard');
     }

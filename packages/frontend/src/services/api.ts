@@ -87,6 +87,9 @@ async function postForm<T>(path: string, form: FormData): Promise<T> {
 
 export const api = {
 
+  publicStats: () =>
+    get<{ members: number; ai_plans: number; cycles: number; coaches: number }>('/stats'),
+
   // ── Auth ────────────────────────────────────────────────────────────────────
 
   login: (email: string, password: string) =>
@@ -267,6 +270,12 @@ export const api = {
       `/coach/clients${search ? `?search=${encodeURIComponent(search)}` : ''}`
     ),
 
+  getClientDetail: (memberId: string) =>
+    get<import('../types').ClientDetail>(`/coach/clients/${memberId}`),
+
+  updateClientNotes: (memberId: string, notes: string) =>
+    patch<{ notes: string }>(`/coach/clients/${memberId}/notes`, { notes }),
+
   getMyCoaches: (search?: string) =>
     get<any[]>(`/chat/my-coaches${search ? `?search=${encodeURIComponent(search)}` : ''}`),
 
@@ -319,6 +328,13 @@ export const api = {
 
   generateAiPlan: (type: 'nutrition' | 'workout') =>
     post<import('../types').Plan>('/plans/generate-ai', { type }),
+
+  /** Coach only: AI-drafted plan content for a client, not saved. */
+  draftPlan: (memberId: string, type: 'nutrition' | 'workout') =>
+    post<import('../types').PlanContent>('/plans/draft', { member_id: memberId, type }),
+
+  archivePlan: (planId: string) =>
+    patch<{ success: boolean }>(`/plans/${planId}/archive`),
 
   completePlanItem: (planId: string, dayOfWeek: number, itemIndex: number) =>
     patch<import('../types').PlanCompletionResult>(`/plans/${planId}/complete`, { day_of_week: dayOfWeek, item_index: itemIndex }),

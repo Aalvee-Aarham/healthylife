@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login',    [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/firebase', [AuthController::class, 'firebaseAuth']);
+Route::get('/stats',          [DashboardController::class, 'publicStats']);
 
 // ── Protected routes (Sanctum token) ─────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
@@ -83,6 +84,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Coach
     Route::get('/coach/clients', [ChatController::class, 'myCoaches']);
+    Route::get('/coach/clients/{member}', [CoachController::class, 'client']);
+    Route::patch('/coach/clients/{member}/notes', [CoachController::class, 'updateNotes']);
 
     // Coaches directory & self-assignment
     Route::get('/coaches',                        [CoachController::class, 'index']);
@@ -93,7 +96,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/plans',                    [PlanController::class, 'index']);
     Route::post('/plans',                   [PlanController::class, 'store']);
     Route::post('/plans/generate-ai',       [PlanController::class, 'generateAi']);
+    Route::post('/plans/draft',             [PlanController::class, 'draft']);
     Route::patch('/plans/{plan}/complete',  [PlanController::class, 'complete']);
+    Route::patch('/plans/{plan}/archive',   [PlanController::class, 'archive']);
 
     // AI
     Route::post('/ai/chat', [AIController::class, 'chat']);

@@ -245,7 +245,7 @@ class ChatService
             return [
                 'clients' => $clients,
                 'totalClients' => count($rows),
-                'avgAdherencePct' => empty($rows) ? 0 : 85,
+                'avgAdherencePct' => empty($rows) ? 0 : (int) round(array_sum(array_column($rows, 'adherence_pct')) / count($rows)),
             ];
         }
 

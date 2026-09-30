@@ -55,11 +55,9 @@ class GymLogService
             ? Carbon::parse($data['loggedAt'])->toDateTimeString()
             : now()->toDateTimeString();
 
-        $logRows = DB::select(
-            'INSERT INTO gym_logs
-                (user_id, title, duration_minutes, calories_burned, notes, logged_at, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-             RETURNING *',
+        // Procedure: sp_log_workout inserts the log and all its sets, returning the new id.
+        $logId = DB::selectOne(
+            'CALL sp_log_workout(?, ?, ?, ?, ?, ?, ?, NULL)',
             [
                 $userId,
                 $data['title'],
@@ -67,48 +65,11 @@ class GymLogService
                 $data['caloriesBurned'] ?? null,
                 $data['notes'] ?? null,
                 $loggedAt,
+                json_encode($data['sets'] ?? []),
             ]
-        );
+        )->p_log_id;
 
-        $log = $logRows[0];
-
-        foreach ($data['sets'] ?? [] as $set) {
-            DB::statement(
-                'INSERT INTO gym_log_sets
-                    (gym_log_id, exercise_name, set_number, reps, weight_kg, completed, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())',
-                [
-                    $log->id,
-                    $set['exerciseName'],
-                    $set['setNumber'],
-                    $set['reps'],
-                    $set['weightKg'],
-                    isset($set['completed']) && $set['completed'] ? true : false,
-                ]
-            );
-        }
-
-        $rows = DB::select(
-            "SELECT
-                gl.id, gl.title, gl.duration_minutes, gl.calories_burned, gl.notes, gl.logged_at,
-                JSON_AGG(
-                    JSON_BUILD_OBJECT(
-                        'id',           gls.id,
-                        'exerciseName', gls.exercise_name,
-                        'setNumber',    gls.set_number,
-                        'reps',         gls.reps,
-                        'weightKg',     gls.weight_kg,
-                        'completed',    gls.completed
-                    ) ORDER BY gls.set_number
-                ) FILTER (WHERE gls.id IS NOT NULL) AS sets_json
-             FROM gym_logs gl
-             LEFT JOIN gym_log_sets gls ON gls.gym_log_id = gl.id
-             WHERE gl.id = ?
-             GROUP BY gl.id",
-            [$log->id]
-        );
-
-        return $this->format($rows[0]);
+        return $this->find($logId);
     }
 
     public function destroy(int $userId, int $gymLogId): void

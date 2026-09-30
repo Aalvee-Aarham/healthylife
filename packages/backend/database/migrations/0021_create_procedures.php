@@ -78,11 +78,29 @@ return new class extends Migration
                 END IF;
             END \$\$
         ");
+
+        // Insert a period, or update its flow if one already starts that day. Used by CycleService::logPeriod().
+        DB::unprepared("
+            CREATE OR REPLACE PROCEDURE sp_log_period(
+                p_user_id    BIGINT,
+                p_started_on DATE,
+                p_flow       VARCHAR,
+                INOUT p_period_id BIGINT
+            )
+            LANGUAGE plpgsql AS \$\$
+            BEGIN
+                INSERT INTO cycle_periods (user_id, started_on, flow, created_at, updated_at)
+                VALUES (p_user_id, p_started_on, p_flow, NOW(), NOW())
+                ON CONFLICT (user_id, started_on) DO UPDATE SET flow = EXCLUDED.flow, updated_at = NOW()
+                RETURNING id INTO p_period_id;
+            END \$\$
+        ");
     }
 
     public function down(): void
     {
         DB::unprepared('
+            DROP PROCEDURE IF EXISTS sp_log_period;
             DROP PROCEDURE IF EXISTS sp_toggle_symptom;
             DROP PROCEDURE IF EXISTS sp_assign_coach;
             DROP PROCEDURE IF EXISTS sp_log_workout;

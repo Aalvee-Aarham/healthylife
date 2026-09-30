@@ -126,23 +126,9 @@ class CycleService
 
     public function logPeriod(int $userId, string $startedOn, string $flow): array
     {
-        $existing = DB::selectOne(
-            'SELECT id FROM cycle_periods WHERE user_id = ? AND started_on = ?',
-            [$userId, $startedOn]
-        );
-
-        if ($existing) {
-            DB::statement('UPDATE cycle_periods SET flow = ?, updated_at = NOW() WHERE id = ?', [$flow, $existing->id]);
-            $period = DB::selectOne('SELECT * FROM cycle_periods WHERE id = ?', [$existing->id]);
-        } else {
-            $rows = DB::select(
-                'INSERT INTO cycle_periods (user_id, started_on, flow, created_at, updated_at)
-                 VALUES (?, ?, ?, NOW(), NOW())
-                 RETURNING *',
-                [$userId, $startedOn, $flow]
-            );
-            $period = $rows[0];
-        }
+        // Procedure: sp_log_period upserts on (user_id, started_on).
+        $periodId = DB::selectOne('CALL sp_log_period(?, ?, ?, NULL)', [$userId, $startedOn, $flow])->p_period_id;
+        $period = DB::selectOne('SELECT * FROM cycle_periods WHERE id = ?', [$periodId]);
 
         return [
             'id' => $period->id,

@@ -23,18 +23,8 @@ class GymLogService
 
     public function stats(int $userId): array
     {
-        $row = DB::selectOne(
-            'SELECT
-                COUNT(DISTINCT gl.id)                 AS total_workouts,
-                COUNT(gls.id)                         AS total_sets,
-                COALESCE(SUM(gl.duration_minutes), 0) AS total_duration_minutes,
-                COALESCE(SUM(gl.calories_burned), 0)  AS total_calories_burned,
-                COALESCE(AVG(gl.duration_minutes), 0) AS avg_session_minutes
-             FROM gym_logs gl
-             LEFT JOIN gym_log_sets gls ON gls.gym_log_id = gl.id
-             WHERE gl.user_id = ?',
-            [$userId]
-        );
+        // View: v_workout_stats (no row = no workouts yet)
+        $row = DB::selectOne('SELECT * FROM v_workout_stats WHERE user_id = ?', [$userId]);
 
         $consistentDays = DB::select(
             'SELECT logged_at::date AS activity_date
@@ -50,11 +40,11 @@ class GymLogService
         );
 
         return [
-            'totalWorkouts' => (int) $row->total_workouts,
-            'totalSets' => (int) $row->total_sets,
-            'totalDurationMinutes' => (int) $row->total_duration_minutes,
-            'totalCaloriesBurned' => (int) $row->total_calories_burned,
-            'avgSessionMinutes' => round((float) $row->avg_session_minutes, 1),
+            'totalWorkouts' => (int) ($row->total_workouts ?? 0),
+            'totalSets' => (int) ($row->total_sets ?? 0),
+            'totalDurationMinutes' => (int) ($row->total_duration_minutes ?? 0),
+            'totalCaloriesBurned' => (int) ($row->total_calories_burned ?? 0),
+            'avgSessionMinutes' => round((float) ($row->avg_session_minutes ?? 0), 1),
             'consistentDays' => array_map(fn ($d) => $d->activity_date, $consistentDays),
         ];
     }

@@ -12,30 +12,9 @@ class GymLogService
 
     public function index(int $userId): array
     {
+        // View: v_gym_logs_with_sets
         $rows = DB::select(
-            "SELECT
-                gl.id,
-                gl.title,
-                gl.duration_minutes,
-                gl.calories_burned,
-                gl.notes,
-                gl.logged_at,
-                JSON_AGG(
-                    JSON_BUILD_OBJECT(
-                        'id',           gls.id,
-                        'exerciseName', gls.exercise_name,
-                        'setNumber',    gls.set_number,
-                        'reps',         gls.reps,
-                        'weightKg',     gls.weight_kg,
-                        'completed',    gls.completed
-                    ) ORDER BY gls.set_number
-                ) FILTER (WHERE gls.id IS NOT NULL) AS sets_json
-             FROM gym_logs gl
-             LEFT JOIN gym_log_sets gls ON gls.gym_log_id = gl.id
-             WHERE gl.user_id = ?
-             GROUP BY gl.id
-             ORDER BY gl.logged_at DESC
-             LIMIT 30",
+            'SELECT * FROM v_gym_logs_with_sets WHERE user_id = ? ORDER BY logged_at DESC LIMIT 30',
             [$userId]
         );
 
@@ -161,27 +140,7 @@ class GymLogService
 
         DB::statement('UPDATE gym_log_sets SET completed = NOT completed, updated_at = NOW() WHERE id = ?', [$setId]);
 
-        $rows = DB::select(
-            "SELECT
-                gl.id, gl.title, gl.duration_minutes, gl.calories_burned, gl.notes, gl.logged_at,
-                JSON_AGG(
-                    JSON_BUILD_OBJECT(
-                        'id',           gls.id,
-                        'exerciseName', gls.exercise_name,
-                        'setNumber',    gls.set_number,
-                        'reps',         gls.reps,
-                        'weightKg',     gls.weight_kg,
-                        'completed',    gls.completed
-                    ) ORDER BY gls.set_number
-                ) FILTER (WHERE gls.id IS NOT NULL) AS sets_json
-             FROM gym_logs gl
-             LEFT JOIN gym_log_sets gls ON gls.gym_log_id = gl.id
-             WHERE gl.id = ?
-             GROUP BY gl.id",
-            [$gymLogId]
-        );
-
-        return $this->format($rows[0]);
+        return $this->find($gymLogId);
     }
 
     /**
@@ -190,6 +149,11 @@ class GymLogService
     public function parse(string $text): array
     {
         return $this->aiService->parseGymLog($text);
+    }
+
+    private function find(int $gymLogId): array
+    {
+        return $this->format(DB::selectOne('SELECT * FROM v_gym_logs_with_sets WHERE id = ?', [$gymLogId]));
     }
 
     private function format(object $log): array

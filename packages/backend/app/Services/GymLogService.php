@@ -77,8 +77,11 @@ class GymLogService
         $existing = DB::selectOne('SELECT user_id FROM gym_logs WHERE id = ?', [$gymLogId]);
         abort_unless($existing && (int) $existing->user_id === $userId, 403);
 
-        DB::statement('DELETE FROM gym_log_sets WHERE gym_log_id = ?', [$gymLogId]);
-        DB::statement('DELETE FROM gym_logs WHERE id = ?', [$gymLogId]);
+        // Transaction: sets and log are removed together or not at all.
+        DB::transaction(function () use ($gymLogId) {
+            DB::statement('DELETE FROM gym_log_sets WHERE gym_log_id = ?', [$gymLogId]);
+            DB::statement('DELETE FROM gym_logs WHERE id = ?', [$gymLogId]);
+        });
     }
 
     public function toggleSet(int $userId, int $gymLogId, int $setId): array

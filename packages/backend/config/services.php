@@ -44,6 +44,11 @@ return [
         'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
     ],
 
+    // Firebase web API key (public — same one the frontend ships), used to verify ID tokens.
+    'firebase' => [
+        'api_key' => env('FIREBASE_API_KEY', 'AIzaSyA5C1JSYQ45VUdTezx2SgVXR9fH0GuZVWY'),
+    ],
+
     'ai' => [
         'provider' => env('AI_PROVIDER', 'groq'),
         // Path to a cacert.pem, only needed when PHP's curl.cainfo is not set.

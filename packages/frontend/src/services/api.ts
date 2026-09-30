@@ -1,4 +1,6 @@
 // HealthyLife API Service — connects frontend to Laravel backend (http://localhost:8000)
+import { auth } from './firebase';
+
 const BASE_URL = '/api';
 
 // ─── Auth token helpers ───────────────────────────────────────────────────────
@@ -93,8 +95,12 @@ export const api = {
   register: (payload: Record<string, unknown>) =>
     post<{ user: any; token: string }>('/auth/register', payload),
 
-  firebaseAuth: (payload: Record<string, unknown>) =>
-    post<{ user: any; token: string }>('/auth/firebase', payload),
+  // Backend verifies the Firebase ID token; the email in payload is not trusted.
+  firebaseAuth: async (payload: Record<string, unknown>) =>
+    post<{ user: any; token: string }>('/auth/firebase', {
+      ...payload,
+      id_token: await auth.currentUser?.getIdToken(),
+    }),
 
   me: () =>
     get<any>('/auth/me'),

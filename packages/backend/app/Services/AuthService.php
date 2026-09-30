@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -129,7 +130,8 @@ class AuthService
 
     public function firebaseAuth(array $validated): array
     {
-        $email = strtolower(trim($validated['email']));
+        $email = $this->verifyFirebaseEmail($validated['id_token']);
+        unset($validated['id_token']);
         $gender = $validated['gender'] ?? 'female';
 
         $defaultAvatar = $gender === 'male'
@@ -190,6 +192,29 @@ class AuthService
             'user' => $this->formatUser($userId),
             'token' => $token,
         ];
+    }
+
+    /**
+     * Verify a Firebase ID token with Google and return its verified email.
+     * Never trust the email the client sends — anyone could claim any account.
+     */
+    private function verifyFirebaseEmail(string $idToken): string
+    {
+        $request = Http::timeout(10);
+        if ($caBundle = config('services.ai.ca_bundle')) {
+            $request = $request->withOptions(['verify' => $caBundle]);
+        }
+
+        $account = $request->post(
+            'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='.config('services.firebase.api_key'),
+            ['idToken' => $idToken]
+        )->json('users.0');
+
+        if (empty($account['email']) || empty($account['emailVerified'])) {
+            throw ValidationException::withMessages(['email' => ['Firebase sign-in could not be verified.']]);
+        }
+
+        return strtolower($account['email']);
     }
 
     public function formatUser(int $userId): array

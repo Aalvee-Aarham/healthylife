@@ -50,6 +50,7 @@ class AuthController extends Controller
     public function firebaseAuth(Request $request)
     {
         $validated = $request->validate([
+            'id_token' => 'required|string',
             'email' => 'required|email',
             'name' => 'nullable|string|max:255',
             'avatar' => 'nullable|string',

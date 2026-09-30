@@ -9,12 +9,11 @@ import {
   Calendar, 
   ChevronDown, 
   ChevronUp, 
-  Sparkles, 
   FileText,
   Activity,
   CheckCircle2
 } from 'lucide-react';
-import { GymLog, GymLogParseResult } from '../../types';
+import { GymLog } from '../../types';
 import { api } from '../../services/api';
 import { Skeleton } from '../ui/Skeleton';
 
@@ -50,11 +49,6 @@ export const WorkoutsView: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // AI "Log with AI" state
-  const [aiText, setAiText] = useState<string>('');
-  const [isParsingAi, setIsParsingAi] = useState<boolean>(false);
-  const [aiParseFailed, setAiParseFailed] = useState<boolean>(false);
 
   // Form State
   const [title, setTitle] = useState<string>('');
@@ -166,50 +160,6 @@ export const WorkoutsView: React.FC = () => {
       [field]: value,
     };
     setExercises(updated);
-  };
-
-  // Parse free-text workout description into a draft, and load it into the
-  // same editable exercise/set builder state used by the manual form.
-  const handleParseWithAi = async () => {
-    if (!aiText.trim()) return;
-    try {
-      setIsParsingAi(true);
-      setAiParseFailed(false);
-      const result: GymLogParseResult = await api.parseGymLog(aiText.trim());
-
-      if (!result.title && (!result.exercises || result.exercises.length === 0)) {
-        setAiParseFailed(true);
-        return;
-      }
-
-      if (result.title) {
-        setTitle(result.title);
-      }
-
-      if (result.exercises && result.exercises.length > 0) {
-        setExercises(
-          result.exercises.map((ex) => ({
-            name: ex.name || '',
-            sets:
-              ex.sets && ex.sets.length > 0
-                ? ex.sets.map((s) => ({
-                    reps: s.reps,
-                    weightKg: s.weight_kg,
-                    completed: false,
-                  }))
-                : [{ reps: 10, weightKg: 20, completed: false }],
-          }))
-        );
-      }
-
-      setIsFormOpen(true);
-      showToast('Draft ready — review and save below.');
-    } catch (err) {
-      console.error('Failed to parse workout text:', err);
-      setAiParseFailed(true);
-    } finally {
-      setIsParsingAi(false);
-    }
   };
 
   // Submit new Gym Log
@@ -421,59 +371,6 @@ export const WorkoutsView: React.FC = () => {
             </h3>
           </div>
         </div>
-      </div>
-
-      {/* Log with AI */}
-      <div className="hl-card p-5 sm:p-6 space-y-3 border-2 border-orange-200/40">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-orange-500" />
-          <h2 className="text-sm font-bold" style={{ color: 'var(--hl-text-primary)' }}>
-            Log with AI
-          </h2>
-        </div>
-        <p className="text-xs" style={{ color: 'var(--hl-text-secondary)' }}>
-          Describe your workout in plain language and we'll draft it for you to review before saving.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            value={aiText}
-            onChange={(e) => setAiText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleParseWithAi();
-              }
-            }}
-            placeholder="e.g. 4x10 bench press at 60kg, 3x12 squats bodyweight"
-            disabled={isParsingAi}
-            className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-60"
-            style={{ background: 'var(--hl-surface-alt)', borderColor: 'var(--hl-border-light)', color: 'var(--hl-text-primary)' }}
-          />
-          <button
-            type="button"
-            onClick={handleParseWithAi}
-            disabled={isParsingAi || !aiText.trim()}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all active:scale-95 disabled:opacity-50 shrink-0"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isParsingAi ? 'Parsing...' : 'Parse'}</span>
-          </button>
-        </div>
-
-        {isParsingAi && (
-          <div className="space-y-2 pt-1">
-            <Skeleton height="0.9rem" width="40%" />
-            <Skeleton height="0.7rem" width="70%" />
-            <Skeleton height="0.7rem" width="55%" />
-          </div>
-        )}
-
-        {!isParsingAi && aiParseFailed && (
-          <div className="text-xs px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-medium">
-            Couldn't understand that workout description. Try rephrasing it, or use the manual entry form below.
-          </div>
-        )}
       </div>
 
       {/* Log Workout Form (Collapsible / Active) */}

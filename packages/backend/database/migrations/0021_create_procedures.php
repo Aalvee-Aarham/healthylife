@@ -38,6 +38,24 @@ return new class extends Migration
                 FROM json_array_elements(COALESCE(p_sets, '[]'::JSON)) AS s;
             END \$\$
         ");
+
+        // Replace the member's coach for a specialty. Used by CoachService::assignCoach().
+        DB::unprepared("
+            CREATE OR REPLACE PROCEDURE sp_assign_coach(
+                p_member_id BIGINT,
+                p_coach_id  BIGINT,
+                p_specialty VARCHAR,
+                INOUT p_assignment_id BIGINT
+            )
+            LANGUAGE plpgsql AS \$\$
+            BEGIN
+                DELETE FROM coach_assignments WHERE member_id = p_member_id AND specialty = p_specialty;
+
+                INSERT INTO coach_assignments (member_id, coach_id, specialty, created_at, updated_at)
+                VALUES (p_member_id, p_coach_id, p_specialty, NOW(), NOW())
+                RETURNING id INTO p_assignment_id;
+            END \$\$
+        ");
     }
 
     public function down(): void

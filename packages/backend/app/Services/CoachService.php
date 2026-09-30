@@ -49,24 +49,18 @@ class CoachService
         );
         abort_unless($coach, 404, 'Coach not found');
 
-        DB::statement(
-            'DELETE FROM coach_assignments WHERE member_id = ? AND specialty = ?',
-            [$memberId, $specialty]
-        );
-
-        $rows = DB::select(
-            'INSERT INTO coach_assignments (member_id, coach_id, specialty, created_at, updated_at)
-             VALUES (?, ?, ?, NOW(), NOW())
-             RETURNING id',
+        // Procedure: sp_assign_coach swaps out the old assignment for this specialty.
+        $assignmentId = DB::selectOne(
+            'CALL sp_assign_coach(?, ?, ?, NULL)',
             [$memberId, $coachId, $specialty]
-        );
+        )->p_assignment_id;
 
         $member = DB::selectOne('SELECT name FROM users WHERE id = ?', [$memberId]);
 
         $this->startConversation($memberId, $coachId, $member->name ?? 'there', $coach->coach_specialty);
 
         return [
-            'id' => (string) $rows[0]->id,
+            'id' => (string) $assignmentId,
             'coach' => [
                 'id' => (string) $coach->id,
                 'name' => $coach->name,

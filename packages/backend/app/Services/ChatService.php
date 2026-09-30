@@ -238,7 +238,7 @@ class ChatService
                 'status' => (int) $m->planned_items === 0 ? 'No Plan'
                     : ((int) $m->adherence_pct >= 70 ? 'On Track' : 'Needs Attention'),
                 'adherencePercent' => (int) $m->adherence_pct,
-                'lastActive' => 'Today',
+                'lastActive' => $m->last_active_at ? Carbon::parse($m->last_active_at)->diffForHumans() : 'Never',
                 'notes' => $m->notes,
             ], $rows);
 

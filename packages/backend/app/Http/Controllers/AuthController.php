@@ -55,6 +55,8 @@ class AuthController extends Controller
             'name' => 'nullable|string|max:255',
             'avatar' => 'nullable|string',
             'role' => 'nullable|string|in:member,coach',
+            'coach_specialty' => 'required_if:role,coach|nullable|string|in:nutritionist,trainer,strength_conditioning,wellness,physiotherapist',
+            'title' => 'nullable|string|max:255',
             'gender' => 'nullable|string|in:female,male,other',
             'weight_current_kg' => 'nullable|numeric',
             'weight_target_kg' => 'nullable|numeric',

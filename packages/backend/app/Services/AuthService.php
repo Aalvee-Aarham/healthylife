@@ -143,18 +143,20 @@ class AuthService
         if (! $existing) {
             $rows = DB::select(
                 'INSERT INTO users
-                    (name, email, password, role, gender, avatar,
+                    (name, email, password, role, coach_specialty, title, gender, avatar,
                      weight_current_kg, weight_target_kg, height_cm, age,
                      goal, activity_level,
                      calories_goal, protein_goal_g, carbs_goal_g, fats_goal_g, water_goal_ml,
                      created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                  RETURNING id',
                 [
                     $validated['name'] ?? explode('@', $email)[0],
                     $email,
                     Hash::make(Str::random(24)),
                     $validated['role'] ?? 'member',
+                    $validated['coach_specialty'] ?? null,
+                    $validated['title'] ?? (isset($validated['coach_specialty']) ? ucfirst($validated['coach_specialty']) : null),
                     $gender,
                     $validated['avatar'] ?? $defaultAvatar,
                     $validated['weight_current_kg'] ?? null,

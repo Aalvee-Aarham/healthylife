@@ -223,7 +223,7 @@ class ChatService
                      SELECT member_id FROM conversations       WHERE coach_id = ?
                  )
                  AND u.role = 'member'
-                 AND (? = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', ?, '%')))
+                 AND (?::text = '' OR LOWER(u.name) LIKE LOWER(CONCAT('%', ?::text, '%')))
                  ORDER BY u.name",
                 [$user->coach_specialty ?? 'trainer', $user->id, $user->id, $user->id, $search, $search]
             );

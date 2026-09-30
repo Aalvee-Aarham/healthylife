@@ -56,11 +56,34 @@ return new class extends Migration
                 RETURNING id INTO p_assignment_id;
             END \$\$
         ");
+
+        // Toggle a symptom on/off for a day; returns the new state. Used by CycleService::toggleSymptom().
+        DB::unprepared("
+            CREATE OR REPLACE PROCEDURE sp_toggle_symptom(
+                p_user_id     BIGINT,
+                p_symptom_key VARCHAR,
+                p_date        DATE,
+                INOUT p_active BOOLEAN
+            )
+            LANGUAGE plpgsql AS \$\$
+            BEGIN
+                DELETE FROM cycle_symptom_logs
+                WHERE user_id = p_user_id AND logged_on = p_date AND symptom_key = p_symptom_key;
+
+                p_active := NOT FOUND;
+
+                IF p_active THEN
+                    INSERT INTO cycle_symptom_logs (user_id, logged_on, symptom_key, created_at, updated_at)
+                    VALUES (p_user_id, p_date, p_symptom_key, NOW(), NOW());
+                END IF;
+            END \$\$
+        ");
     }
 
     public function down(): void
     {
         DB::unprepared('
+            DROP PROCEDURE IF EXISTS sp_toggle_symptom;
             DROP PROCEDURE IF EXISTS sp_assign_coach;
             DROP PROCEDURE IF EXISTS sp_log_workout;
         ');

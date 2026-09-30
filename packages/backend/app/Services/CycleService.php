@@ -217,22 +217,8 @@ class CycleService
 
     public function toggleSymptom(int $userId, string $symptomKey, string $date): array
     {
-        $existing = DB::selectOne(
-            'SELECT id FROM cycle_symptom_logs WHERE user_id = ? AND logged_on = ? AND symptom_key = ?',
-            [$userId, $date, $symptomKey]
-        );
-
-        if ($existing) {
-            DB::statement('DELETE FROM cycle_symptom_logs WHERE id = ?', [$existing->id]);
-            $active = false;
-        } else {
-            DB::statement(
-                'INSERT INTO cycle_symptom_logs (user_id, logged_on, symptom_key, created_at, updated_at)
-                 VALUES (?, ?, ?, NOW(), NOW())',
-                [$userId, $date, $symptomKey]
-            );
-            $active = true;
-        }
+        // Procedure: sp_toggle_symptom deletes the log if present, else inserts it.
+        $active = (bool) DB::selectOne('CALL sp_toggle_symptom(?, ?, ?, NULL)', [$userId, $symptomKey, $date])->p_active;
 
         return [
             'symptom_key' => $symptomKey,

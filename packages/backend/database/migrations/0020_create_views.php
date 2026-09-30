@@ -78,6 +78,47 @@ return new class extends Migration
             ) s ON s.gym_log_id = gl.id
             GROUP BY gl.user_id
         ");
+
+        // Plan adherence + last activity per member (users JOIN plans JOIN plan_completions).
+        // planned_items counts every item across the 7 days of each active plan's JSON.
+        // Used by ChatService::myCoaches() for the coach's client list.
+        DB::unprepared("
+            CREATE OR REPLACE VIEW v_client_adherence AS
+            WITH plan_progress AS (
+                SELECT
+                    p.member_id,
+                    (
+                        SELECT COALESCE(SUM(json_array_length(day->'items')), 0)
+                        FROM (
+                            -- PHP's json_encode stores days keyed 0..6 as an array, other keys as an object.
+                            SELECT value AS day FROM json_array_elements(CASE WHEN json_typeof(p.content->'days') = 'array' THEN p.content->'days' END)
+                            UNION ALL
+                            SELECT value FROM json_each(CASE WHEN json_typeof(p.content->'days') = 'object' THEN p.content->'days' END)
+                        ) days
+                        WHERE json_typeof(day->'items') = 'array'
+                    ) AS planned_items,
+                    COUNT(pc.id) FILTER (WHERE pc.completed_at IS NOT NULL) AS completed_items
+                FROM plans p
+                LEFT JOIN plan_completions pc ON pc.plan_id = p.id
+                WHERE p.status = 'active'
+                GROUP BY p.id
+            )
+            SELECT
+                u.id                                   AS member_id,
+                COUNT(pp.member_id)                    AS active_plans,
+                COALESCE(SUM(pp.planned_items), 0)     AS planned_items,
+                COALESCE(SUM(pp.completed_items), 0)   AS completed_items,
+                LEAST(100, COALESCE(ROUND(100.0 * SUM(pp.completed_items) / NULLIF(SUM(pp.planned_items), 0)), 0)) AS adherence_pct,
+                GREATEST(
+                    (SELECT MAX(logged_at) FROM meals      WHERE user_id = u.id),
+                    (SELECT MAX(logged_at) FROM gym_logs   WHERE user_id = u.id),
+                    (SELECT MAX(logged_at) FROM water_logs WHERE user_id = u.id)
+                ) AS last_active_at
+            FROM users u
+            LEFT JOIN plan_progress pp ON pp.member_id = u.id
+            WHERE u.role = 'member'
+            GROUP BY u.id
+        ");
     }
 
     public function down(): void

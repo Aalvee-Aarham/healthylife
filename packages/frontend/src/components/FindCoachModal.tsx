@@ -40,12 +40,12 @@ export const FindCoachModal: React.FC<FindCoachModalProps> = ({ isOpen, onClose,
 
   if (!isOpen) return null;
 
-  const handleAssign = async (coach: CoachListing) => {
+  const handleAssign = async (coach: CoachListing, specialty: CoachSpecialty) => {
     setAssigningId(coach.id);
     setError(null);
     setSuccessMsg(null);
     try {
-      const existing = currentAssignments?.find((a) => a.specialty === coach.coachSpecialty);
+      const existing = currentAssignments?.find((a) => a.specialty === specialty);
       if (existing) {
         try {
           await api.removeCoachAssignment(existing.id);
@@ -53,8 +53,8 @@ export const FindCoachModal: React.FC<FindCoachModalProps> = ({ isOpen, onClose,
           console.warn('Failed to remove previous coach assignment, continuing anyway:', e);
         }
       }
-      await api.assignCoach(coach.id, coach.coachSpecialty);
-      setSuccessMsg(`${coach.name} is now your ${coach.coachSpecialty === 'nutritionist' ? 'Nutritionist' : 'Trainer'}!`);
+      await api.assignCoach(coach.id, specialty);
+      setSuccessMsg(`${coach.name} is now your ${specialty === 'nutritionist' ? 'Nutritionist' : 'Trainer'}!`);
       onAssigned?.();
     } catch (e: any) {
       setError(e?.message || 'Failed to assign coach. Please try again.');
@@ -62,6 +62,44 @@ export const FindCoachModal: React.FC<FindCoachModalProps> = ({ isOpen, onClose,
       setAssigningId(null);
     }
   };
+
+  const renderCoach = (coach: CoachListing, label: string, specialties: CoachSpecialty[]) => (
+    <Card key={coach.id} hover padding="p-4" className="flex items-center gap-3">
+      {coach.avatar ? (
+        <img src={coach.avatar} alt={coach.name} className="w-11 h-11 rounded-2xl object-cover shrink-0" />
+      ) : (
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-white shrink-0" style={{ background: 'var(--hl-green)' }}>
+          {coach.name.charAt(0)}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-bold truncate" style={{ color: 'var(--hl-text-primary)' }}>{coach.name}</p>
+        <p className="text-[10px] truncate" style={{ color: 'var(--hl-text-tertiary)' }}>{coach.title || label}</p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {specialties.map((specialty) => {
+          const isCurrent = currentAssignments?.some((a) => a.specialty === specialty && a.coach.id === coach.id);
+          const action = isCurrent ? 'Switch' : 'Select';
+          return (
+            <Button
+              key={specialty}
+              size="sm"
+              variant="primary"
+              loading={assigningId === coach.id}
+              onClick={() => handleAssign(coach, specialty)}
+              disabled={assigningId !== null}
+            >
+              {specialties.length > 1 ? `${action} as ${SPECIALTIES.find((s) => s.key === specialty)!.label}` : action}
+            </Button>
+          );
+        })}
+      </div>
+    </Card>
+  );
+
+  // Coaches without a trainer/nutritionist specialty (e.g. Google sign-ups before it was saved):
+  // the member picks which role they fill.
+  const otherCoaches = coaches.filter((c) => !SPECIALTIES.some((s) => s.key === c.coachSpecialty));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.5)' }}>
@@ -111,37 +149,22 @@ export const FindCoachModal: React.FC<FindCoachModalProps> = ({ isOpen, onClose,
                   <span>{label}s</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {list.map((coach) => {
-                    const isCurrent = currentAssignments?.some((a) => a.specialty === coach.coachSpecialty && a.coach.id === coach.id);
-                    return (
-                      <Card key={coach.id} hover padding="p-4" className="flex items-center gap-3">
-                        {coach.avatar ? (
-                          <img src={coach.avatar} alt={coach.name} className="w-11 h-11 rounded-2xl object-cover shrink-0" />
-                        ) : (
-                          <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-white shrink-0" style={{ background: 'var(--hl-green)' }}>
-                            {coach.name.charAt(0)}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold truncate" style={{ color: 'var(--hl-text-primary)' }}>{coach.name}</p>
-                          <p className="text-[10px] truncate" style={{ color: 'var(--hl-text-tertiary)' }}>{coach.title || label}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          loading={assigningId === coach.id}
-                          onClick={() => handleAssign(coach)}
-                          disabled={assigningId !== null}
-                        >
-                          {isCurrent ? 'Switch' : 'Select'}
-                        </Button>
-                      </Card>
-                    );
-                  })}
+                  {list.map((coach) => renderCoach(coach, label, [key]))}
                 </div>
               </div>
             );
           })
+        )}
+
+        {!isLoading && otherCoaches.length > 0 && (
+          <div className="space-y-3">
+            <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--hl-text-secondary)' }}>
+              Coaches
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {otherCoaches.map((coach) => renderCoach(coach, 'Coach', SPECIALTIES.map((s) => s.key)))}
+            </div>
+          </div>
         )}
 
         {!isLoading && coaches.length === 0 && !error && (

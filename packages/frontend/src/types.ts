@@ -356,7 +356,8 @@ export interface CoachListing {
   id: string;
   name: string;
   avatar: string;
-  coachSpecialty: CoachSpecialty;
+  /** null for coaches who signed up without picking one. */
+  coachSpecialty: CoachSpecialty | null;
   title?: string;
 }
 

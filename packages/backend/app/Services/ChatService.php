@@ -236,7 +236,9 @@ class ChatService
                 'planName' => $m->specialty === 'nutritionist' ? 'Nutrition Plan' : 'Training Plan',
                 // status/adherence remain a lightweight stub for now — real plan-completion
                 // aggregates can replace these once plan_completions has enough data.
-                'status' => 'On Track',
+                // From view v_client_adherence.
+                'status' => (int) $m->planned_items === 0 ? 'No Plan'
+                    : ((int) $m->adherence_pct >= 70 ? 'On Track' : 'Needs Attention'),
                 'adherencePercent' => 85,
                 'lastActive' => 'Today',
                 'notes' => $m->notes,

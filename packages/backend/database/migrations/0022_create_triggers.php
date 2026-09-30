@@ -49,14 +49,33 @@ return new class extends Migration
             BEFORE DELETE ON gym_logs
             FOR EACH ROW EXECUTE FUNCTION fn_uncheck_plan_item();
         ");
+
+        // Logging a new period closes any earlier period that was left open,
+        // using the default 5-day length (never past the day before the new one).
+        DB::unprepared("
+            CREATE OR REPLACE FUNCTION fn_close_previous_period() RETURNS TRIGGER
+            LANGUAGE plpgsql AS \$\$
+            BEGIN
+                UPDATE cycle_periods
+                SET ended_on = LEAST(started_on + 4, NEW.started_on - 1), updated_at = NOW()
+                WHERE user_id = NEW.user_id AND ended_on IS NULL AND started_on < NEW.started_on;
+                RETURN NEW;
+            END \$\$;
+
+            CREATE TRIGGER trg_cycle_periods_close_previous
+            BEFORE INSERT ON cycle_periods
+            FOR EACH ROW EXECUTE FUNCTION fn_close_previous_period();
+        ");
     }
 
     public function down(): void
     {
         DB::unprepared('
+            DROP TRIGGER IF EXISTS trg_cycle_periods_close_previous ON cycle_periods;
             DROP TRIGGER IF EXISTS trg_gym_logs_uncheck_plan_item ON gym_logs;
             DROP TRIGGER IF EXISTS trg_meals_uncheck_plan_item ON meals;
             DROP TRIGGER IF EXISTS trg_plans_archive_previous ON plans;
+            DROP FUNCTION IF EXISTS fn_close_previous_period;
             DROP FUNCTION IF EXISTS fn_uncheck_plan_item;
             DROP FUNCTION IF EXISTS fn_archive_previous_plans;
         ');

@@ -34,11 +34,11 @@ class AuthService
     {
         $role = $validated['role'] ?? 'member';
 
-        if ($role === 'coach') {
-            return $this->registerCoach($validated);
-        }
-
-        return $this->registerMember($validated);
+        // Transaction: the user row and its login token are saved together, so a failed
+        // token never leaves a half-created account that blocks signing up again.
+        return DB::transaction(fn () => $role === 'coach'
+            ? $this->registerCoach($validated)
+            : $this->registerMember($validated));
     }
 
     private function registerMember(array $validated): array

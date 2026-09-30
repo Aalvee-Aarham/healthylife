@@ -95,32 +95,36 @@ class CoachService
      */
     public function startConversation(int $memberId, int $coachId, string $memberName, ?string $coachSpecialty): int
     {
-        $convRows = DB::select(
-            'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
-             VALUES (?, ?, NOW(), NOW())
-             ON CONFLICT (member_id, coach_id) DO UPDATE SET updated_at = conversations.updated_at
-             RETURNING id',
-            [$memberId, $coachId]
-        );
-        $convId = $convRows[0]->id;
-
-        $msgCount = DB::selectOne(
-            'SELECT COUNT(*) AS cnt FROM chat_messages WHERE conversation_id = ?',
-            [$convId]
-        );
-
-        if ((int) $msgCount->cnt === 0) {
-            $body = $coachSpecialty === 'trainer'
-                ? "Hi {$memberName}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!"
-                : "Welcome {$memberName}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!";
-
-            DB::statement(
-                'INSERT INTO chat_messages (conversation_id, sender_id, body, created_at, updated_at)
-                 VALUES (?, ?, ?, NOW(), NOW())',
-                [$convId, $coachId, $body]
+        // Transaction: the upsert below row-locks the conversation until commit, so two
+        // simultaneous calls can't both see 0 messages and post the welcome twice.
+        return DB::transaction(function () use ($memberId, $coachId, $memberName, $coachSpecialty) {
+            $convRows = DB::select(
+                'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
+                 VALUES (?, ?, NOW(), NOW())
+                 ON CONFLICT (member_id, coach_id) DO UPDATE SET updated_at = conversations.updated_at
+                 RETURNING id',
+                [$memberId, $coachId]
             );
-        }
+            $convId = $convRows[0]->id;
 
-        return $convId;
+            $msgCount = DB::selectOne(
+                'SELECT COUNT(*) AS cnt FROM chat_messages WHERE conversation_id = ?',
+                [$convId]
+            );
+
+            if ((int) $msgCount->cnt === 0) {
+                $body = $coachSpecialty === 'trainer'
+                    ? "Hi {$memberName}! I'm your Fitness & Training Coach. Let me know your workout goals or any exercise questions!"
+                    : "Welcome {$memberName}! I'm your Nutrition Coach. Feel free to share your meal logs, dietary goals, or macro questions anytime!";
+
+                DB::statement(
+                    'INSERT INTO chat_messages (conversation_id, sender_id, body, created_at, updated_at)
+                     VALUES (?, ?, ?, NOW(), NOW())',
+                    [$convId, $coachId, $body]
+                );
+            }
+
+            return $convId;
+        });
     }
 }

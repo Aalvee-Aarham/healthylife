@@ -41,6 +41,10 @@ return new class extends Migration
                 RETURN OLD;
             END \$\$;
 
+            CREATE TRIGGER trg_meals_uncheck_plan_item
+            BEFORE DELETE ON meals
+            FOR EACH ROW EXECUTE FUNCTION fn_uncheck_plan_item();
+
             CREATE TRIGGER trg_gym_logs_uncheck_plan_item
             BEFORE DELETE ON gym_logs
             FOR EACH ROW EXECUTE FUNCTION fn_uncheck_plan_item();
@@ -51,6 +55,7 @@ return new class extends Migration
     {
         DB::unprepared('
             DROP TRIGGER IF EXISTS trg_gym_logs_uncheck_plan_item ON gym_logs;
+            DROP TRIGGER IF EXISTS trg_meals_uncheck_plan_item ON meals;
             DROP TRIGGER IF EXISTS trg_plans_archive_previous ON plans;
             DROP FUNCTION IF EXISTS fn_uncheck_plan_item;
             DROP FUNCTION IF EXISTS fn_archive_previous_plans;

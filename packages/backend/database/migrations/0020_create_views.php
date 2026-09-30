@@ -124,6 +124,7 @@ return new class extends Migration
     public function down(): void
     {
         DB::unprepared('
+            DROP VIEW IF EXISTS v_client_adherence;
             DROP VIEW IF EXISTS v_workout_stats;
             DROP VIEW IF EXISTS v_gym_logs_with_sets;
             DROP VIEW IF EXISTS v_daily_intake;

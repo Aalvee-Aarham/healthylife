@@ -2,6 +2,7 @@ langchain-core
 langchain-text-splitters
 langchain-huggingface
 langchain-mongodb
+langchain-groq
 sentence-transformers
 pypdf
 pymongo

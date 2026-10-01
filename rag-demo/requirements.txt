@@ -1,0 +1,9 @@
+langchain-core
+langchain-text-splitters
+langchain-huggingface
+langchain-mongodb
+sentence-transformers
+pypdf
+pymongo
+python-dotenv
+ipykernel

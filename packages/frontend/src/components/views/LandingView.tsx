@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavigationTab } from '../../types';
 import { api } from '../../services/api';
+import { PolicyChatWidget } from '../PolicyChatWidget';
 import {
   Sparkles,
   ArrowRight,
@@ -469,6 +470,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onSelectTab, onOpenAut
   return (
     <div className="pb-20">
       <style>{LANDING_CSS}</style>
+      <PolicyChatWidget />
 
       {/* ============================= HERO ============================= */}
       <section

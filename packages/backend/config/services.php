@@ -49,6 +49,11 @@ return [
         'api_key' => env('FIREBASE_API_KEY', 'AIzaSyA5C1JSYQ45VUdTezx2SgVXR9fH0GuZVWY'),
     ],
 
+    // Python policy RAG service (rag-demo/rag_demo.ipynb, section C).
+    'rag' => [
+        'url' => env('RAG_API_URL', 'http://localhost:8001'),
+    ],
+
     'ai' => [
         'provider' => env('AI_PROVIDER', 'groq'),
         // Path to a cacert.pem, only needed when PHP's curl.cainfo is not set.

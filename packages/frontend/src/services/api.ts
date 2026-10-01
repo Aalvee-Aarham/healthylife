@@ -90,6 +90,10 @@ export const api = {
   publicStats: () =>
     get<{ members: number; ai_plans: number; cycles: number; coaches: number }>('/stats'),
 
+  /** Public policy chatbot — RAG over the HealthyLife Policy Handbook (rag-demo/rag_demo.ipynb, section C). */
+  askPolicy: (question: string) =>
+    post<{ answer: string }>('/policy/ask', { question }),
+
   // ── Auth ────────────────────────────────────────────────────────────────────
 
   login: (email: string, password: string) =>

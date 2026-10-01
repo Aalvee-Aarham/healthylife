@@ -11,6 +11,7 @@ use App\Http\Controllers\MealController;
 use App\Http\Controllers\MealPlanController;
 use App\Http\Controllers\MealPresetController;
 use App\Http\Controllers\PlanController;
+use App\Http\Controllers\PolicyBotController;
 use App\Http\Controllers\WaterLogController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,7 @@ Route::post('/auth/login',    [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/firebase', [AuthController::class, 'firebaseAuth']);
 Route::get('/stats',          [DashboardController::class, 'publicStats']);
+Route::post('/policy/ask',    [PolicyBotController::class, 'ask'])->middleware('throttle:10,1');
 
 // ── Protected routes (Sanctum token) ─────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {

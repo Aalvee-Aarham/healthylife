@@ -20,3 +20,4 @@ metadata.json
 *.md
 !README.md
 *.docx
+.venv/

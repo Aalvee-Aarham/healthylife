@@ -84,16 +84,18 @@ npm run dev                     # starts backend (:8000) and frontend (:3000)
 
 ## 🚢 Deployment (Railway)
 
-The Railway project `healthylife` has two services:
+The Railway project `healthylife` has three services:
 
 - **`web`** — built from the root `Dockerfile`. One container serves both the API (`/api/*`) and the SPA (everything else). Migrations run on each boot.
 - **`Postgres`** — Railway Postgres; `web` connects via `DB_URL=${{Postgres.DATABASE_URL}}`.
+- **`policy-bot`** — the landing-page policy chatbot. It runs `rag-demo/rag_demo.ipynb` (RAG over the policy handbook) and serves it privately; `web` calls it via `RAG_API_URL=http://policy-bot.railway.internal:8001`. See [rag-demo/README.md](rag-demo/README.md).
 
 Deploy from your machine:
 
 ```bash
 railway link          # select the healthylife project
 railway up --service web
+railway up ./rag-demo --path-as-root --service policy-bot
 ```
 
 `web` service variables: `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `DB_CONNECTION=pgsql`, `DB_URL`, `QUEUE_CONNECTION=sync`, `SESSION_DRIVER=file`, `CACHE_STORE=file`, `LOG_CHANNEL=stderr`, the AI keys above, and `VITE_PEXELS_API_KEY` (passed to the frontend build).

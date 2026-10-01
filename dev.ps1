@@ -1,4 +1,4 @@
-# HealthyLife Dev Script - Starts PostgreSQL, Laravel (backend), and Vite (frontend) together
+# HealthyLife Dev Script - Starts PostgreSQL, Laravel (backend), the policy chatbot, and Vite (frontend) together
 
 $PHP = 'C:\Users\User\AppData\Local\Microsoft\WinGet\Packages\PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe\php.exe'
 $POSTGRES = 'C:\Program Files\PostgreSQL\17\bin\postgres.exe'
@@ -41,22 +41,50 @@ $backendProc = Start-Process -FilePath $PHP -ArgumentList 'artisan', 'serve', '-
 
 Write-Host "  Backend PID: $($backendProc.Id)" -ForegroundColor DarkGray
 
-# Give Laravel a moment to boot
-Start-Sleep -Seconds 2
+# Wait until Laravel accepts connections, else Vite's first /api calls fail with ECONNREFUSED
+$deadline = (Get-Date).AddSeconds(30)
+while (-not (Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 500
+}
 
-# 4. Start Vite frontend in foreground (Ctrl+C stops everything)
+# 4. Start the policy chatbot: runs rag-demo\rag_demo.ipynb headless; its API is ready on :8001 after ~1 min
+$RAG_DIR = Join-Path $PSScriptRoot 'rag-demo'
+$JUPYTER = Join-Path $RAG_DIR '.venv\Scripts\jupyter.exe'
+$ragProc = $null
+
+if (Get-NetTCPConnection -LocalPort 8001 -State Listen -ErrorAction SilentlyContinue) {
+    Write-Host '  Policy chatbot is already running on port 8001.' -ForegroundColor Green
+} elseif (Test-Path $JUPYTER) {
+    Write-Host '  Starting policy chatbot (rag_demo.ipynb), ready on http://localhost:8001 in ~1 min ...' -ForegroundColor DarkCyan
+    $env:KEEP_API_RUNNING = '1'
+    $ragProc = Start-Process -FilePath $JUPYTER -ArgumentList 'execute', 'rag_demo.ipynb' -WorkingDirectory $RAG_DIR -PassThru -WindowStyle Minimized
+    Remove-Item Env:KEEP_API_RUNNING
+    Write-Host "  Chatbot PID: $($ragProc.Id)" -ForegroundColor DarkGray
+} else {
+    Write-Host '  [WARN] rag-demo\.venv not found, policy chatbot skipped (setup: rag-demo\README.md).' -ForegroundColor Yellow
+}
+
+# 5. Start Vite frontend in foreground (Ctrl+C stops everything)
 Write-Host '  Starting Vite frontend on http://localhost:3000 ...' -ForegroundColor DarkCyan
 Write-Host ''
 Write-Host '  Press Ctrl+C to stop all servers.' -ForegroundColor Yellow
 Write-Host ''
 
 try {
-    npm run dev
+    # Frontend only: the backend is already running (root `npm run dev` would start a 2nd Laravel on :8001).
+    # cd instead of `npm --prefix <path>`: npm runs via cmd.exe, which splits the path at the "&" in the folder name.
+    Push-Location $PSScriptRoot
+    npm run dev:frontend
 } finally {
+    Pop-Location
     Write-Host ''
-    Write-Host '  Stopping backend...' -ForegroundColor Red
+    Write-Host '  Stopping backend and chatbot...' -ForegroundColor Red
     if ($backendProc -and -not $backendProc.HasExited) {
         Stop-Process -Id $backendProc.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($ragProc -and -not $ragProc.HasExited) {
+        # /T also stops the notebook's Python kernel, which holds port 8001
+        taskkill /PID $ragProc.Id /T /F | Out-Null
     }
     Get-Process -Name 'php' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }

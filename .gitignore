@@ -18,8 +18,8 @@ metadata.json
 .vscode/
 
 *.md
+
 !README.md
-!COMMIT_PLAN.md
 *.docx
 .venv/
 s20230204085*

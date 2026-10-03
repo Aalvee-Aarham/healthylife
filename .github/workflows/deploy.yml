@@ -1,0 +1,82 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DEPLOY_USER: s20230204085
+  DEPLOY_HOST: 187.52.122.100
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Use PHP 8.4, same as the server
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_mysql, mbstring, xml, ctype, curl, bcmath
+
+      - name: Install the PHP packages
+        run: |
+          cd packages/backend
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Build the React app
+        run: |
+          npm ci
+          npm run build --workspace @healthy-life/frontend
+          test -f packages/backend/public/app/index.html || (echo "public/app/index.html missing!" && exit 1)
+
+      - name: Pack the release
+        run: |
+          cd packages/backend
+          tar --exclude='.git' --exclude='node_modules' --exclude='.env' --exclude='.env.*' -czf ../../release.tar.gz .
+          cd ../..
+          tar -tf release.tar.gz | grep "public/app/index.html" || (echo "public/app/index.html missing from release!" && exit 1)
+          tar -tf release.tar.gz | grep "vendor/" || (echo "vendor missing from release!" && exit 1)
+
+      - name: Load the deploy key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Copy the release with scp
+        run: |
+          scp -i ~/.ssh/deploy_key release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:~/"
+          scp -i ~/.ssh/deploy_key rag-demo/data/healthylife_policy_handbook.pdf "$DEPLOY_USER@$DEPLOY_HOST:~/healthylife_policy_handbook.pdf"
+
+      - name: Deploy on the server
+        run: |
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" bash -s << 'ENDSSH'
+          set -e
+          mkdir -p ~/laravel
+          tar -xzf ~/release.tar.gz -C ~/laravel
+          chmod -R u+rwX ~/laravel/storage ~/laravel/bootstrap/cache
+          mkdir -p ~/laravel/storage/framework/views ~/laravel/storage/framework/cache ~/laravel/storage/framework/sessions
+          mkdir -p ~/laravel/storage/app/policy
+          cp -f ~/healthylife_policy_handbook.pdf ~/laravel/storage/app/policy/healthylife_policy_handbook.pdf
+          setfacl -m u:www-data:x ~ ~/laravel 2>/dev/null || true
+          setfacl -R -m u:www-data:rX -m d:u:www-data:rX ~/laravel/public 2>/dev/null || true
+          cp -f ~/.env ~/laravel/.env
+          cd ~/laravel
+          php artisan config:cache
+          php artisan route:cache
+          php artisan migrate --force
+          php artisan db:seed --force
+          php artisan storage:link 2>/dev/null || true
+          rm -f ~/release.tar.gz ~/healthylife_policy_handbook.pdf
+          ENDSSH

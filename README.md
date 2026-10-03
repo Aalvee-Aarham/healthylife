@@ -2,7 +2,7 @@
 
 A production full-stack holistic wellness platform featuring a React + Vite frontend running on a Laravel 12 API with dual MySQL 8 / PostgreSQL support. HealthyLife combines AI-powered nutrition tracking, workout planning, biological cycle syncing, and multi-role portals for members and coaches.
 
-**Live Deployment:** [http://healthylife.austattendance.online](http://healthylife.austattendance.online)
+**Live Deployment:** [https://healthylife.austattendance.online](https://healthylife.austattendance.online)
 
 ---
 

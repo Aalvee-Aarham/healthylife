@@ -19,5 +19,10 @@ metadata.json
 
 *.md
 !README.md
+!COMMIT_PLAN.md
 *.docx
 .venv/
+s20230204085*
+/packages/backend/public/app
+/public/app
+release.tar.gz

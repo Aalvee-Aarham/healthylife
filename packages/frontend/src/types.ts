@@ -7,6 +7,7 @@ export type NavigationTab =
   | 'signin'
   | 'signup'
   | 'signout'
+  | 'policy'
   | 'ai-assistant'
   | 'dashboard'
   | 'nutrition'
@@ -18,6 +19,7 @@ export type NavigationTab =
   | 'clients'
   | 'consultations'
   | 'plan-builder';
+
 
 export type ApiStatus = 'idle' | 'loading' | 'ok' | 'error';
 

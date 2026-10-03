@@ -44,6 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
           : { title: 'Coach Messaging', subtitle: 'Direct communication with your coach' };
       case 'water':
         return { title: 'Nutrition & Hydration', subtitle: 'Daily water intake, meals & macros' };
+      case 'policy':
+        return { title: 'Policy Handbook', subtitle: 'Platform terms, coaching guidelines & AI policy' };
       default:
         return { title: 'HealthyLife', subtitle: 'Holistic Health & Wellness Platform' };
     }

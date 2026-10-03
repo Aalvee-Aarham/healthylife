@@ -1,114 +1,102 @@
 # HealthyLife — Holistic Health, Fitness & Coaching Platform
 
-A full-stack holistic wellness platform: a React + Vite frontend on a Laravel + PostgreSQL API. HealthyLife combines AI-powered nutrition tracking, workout planning, cycle syncing, and multi-role portals for members and coaches.
+A production full-stack holistic wellness platform featuring a React + Vite frontend running on a Laravel 12 API with dual MySQL 8 / PostgreSQL support. HealthyLife combines AI-powered nutrition tracking, workout planning, biological cycle syncing, and multi-role portals for members and coaches.
 
-**Live:** https://web-production-8d9bf4.up.railway.app
-
----
-
-## 🚀 Features
-
-- **AI Food Logger** — Log meals via natural language. Auto-fetches food images via Pexels API.
-- **Macro & Water Tracker** — Visual progress rings for Calories, Protein, Carbs, Fats, and hydration.
-- **Workouts & Sculpt** — Daily training schedules with muscle group targeting and PR logging.
-- **CycleSync™** — 28-day biological phase tracker with symptom logging and phase-specific recommendations.
-- **AI Health Advisor** — Groq (Llama-3.3-70b) or Gemini, switchable via `AI_PROVIDER`.
-- **Coach Portal** — Client roster, chat, plans, and AI workout plan generator.
-- **Auth** — Email/password or Google sign-in (Firebase), backed by Laravel Sanctum tokens.
-- **Light / Dark Mode** — Full Organic Tech design system with glassmorphic UI.
+**Live Deployment:** [http://healthylife.austattendance.online](http://healthylife.austattendance.online)
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 Key Features
 
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Motion, Lucide
-- **Backend:** Laravel 12 (PHP 8.2), Sanctum
-- **Database:** PostgreSQL 16 (views, procedures, and triggers live in migrations)
-- **Auth:** Firebase Authentication (Google) + Sanctum
-- **AI:** Groq / Gemini
-- **Images:** Pexels API
-- **Hosting:** Railway
-
----
-
-## 📁 Structure
-
-```
-packages/
-  frontend/   React SPA (calls the API at relative /api)
-  backend/    Laravel API
-Dockerfile    Production image: builds the SPA into Laravel's public/ (Railway)
-docker-compose.yml   Local dev stack: Postgres + backend + frontend
-```
+- **AI Food Logger & Image Scanner** — Natural language meal logging and food recognition via Groq/Gemini & Cloudinary, with automated image previews.
+- **Macro & Water Tracker** — Real-time tracking for Calories, Protein, Carbs, Fats, and daily hydration goals.
+- **Workouts & Sculpt Log** — Gym session logger with exercise sets, reps, weight, PR tracking, and workout history.
+- **CycleSync™ Phase Tracker** — Biological cycle tracking with hormonal alignment, symptom logging, and phase-specific recommendations.
+- **AI Health Advisor** — Dual-provider intelligence (Groq Llama-3.3-70b / Gemini) for personalized fitness advice.
+- **Coach & Client Portal** — Dedicated coach dashboard, client adherence monitoring, 1-on-1 messaging, and customized plan assignment.
+- **Policy Handbook & Policy Bot** — In-app policy reader with embedded PDF handbook viewer and real-time AI Policy Bot for membership, refund, and coaching inquiries.
+- **Auth & Access Control** — Email/password & Google Firebase authentication with Laravel Sanctum multi-role API tokens.
 
 ---
 
-## ⚙️ Run Locally
+## 👥 Demo Test Accounts
 
-### Option A — Docker (recommended)
+The live system is pre-seeded with test accounts for immediate evaluation:
 
+| Email | Password | Role | Description |
+|---|---|---|---|
+| `demo@demo.com` | `password` | **Member** | Active member account with pre-filled meals, workout logs & hydration |
+| `coach@demo.com` | `password` | **Coach** | Fitness Coach profile (`Alex Rivera, CSCS`) with active client rosters |
+| `nutri@demo.com` | `password` | **Coach** | Nutrition Specialist profile (`Dr. Elena Chen`) with client consultations |
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Motion, Lucide Icons
+- **Backend:** Laravel 12 (PHP 8.4), Laravel Sanctum
+- **Database:** MySQL 8 / PostgreSQL 16 (stored procedures, views, triggers, and transactions)
+- **Deployment & Hosting:** VPS (Ubuntu 24.04, Nginx, PHP 8.4-FPM)
+- **CI/CD Pipeline:** GitHub Actions automated deployment on push to `main`
+- **AI & External APIs:** Groq API, Google Gemini, Cloudinary, Pexels API, Firebase Auth
+
+---
+
+## 🗄️ Database Architecture (Stored Logic)
+
+HealthyLife employs database-level business logic across migrations:
+- **Views:** `v_gym_logs_with_sets`, `v_workout_stats`, `v_client_adherence`, `v_daily_intake`
+- **Stored Procedures:** `sp_log_workout`, `sp_assign_coach`, `sp_toggle_symptom`, `sp_log_period`
+- **Triggers:** `trg_gym_logs_uncheck_plan_item`, `trg_plans_archive_previous`, `trg_cycle_periods_close_previous`, `trg_meals_uncheck_plan_item`
+- **Transactions:** Atomic transactions for user registration, coach switching, workout deletion, and chat initiation.
+
+---
+
+## 🚢 CI/CD Deployment Workflow
+
+Every push to the `main` branch automatically triggers our GitHub Actions pipeline (`.github/workflows/deploy.yml`):
+1. **PHP 8.4 Environment:** Configures PHP extensions (`pdo`, `pdo_mysql`, `mbstring`, `xml`, `bcmath`).
+2. **Backend Dependencies:** Installs production Composer packages with optimized autoloading.
+3. **Frontend Build:** Installs Node modules and compiles the React SPA directly into Laravel's public asset directory.
+4. **Release Bundle:** Packages a clean tarball excluding dev files and git metadata.
+5. **Secure SCP Transfer:** Deploys the release bundle and policy assets directly to the VPS via SSH key authentication.
+6. **Server Automation:** Extracts files, sets permissions for `www-data`, runs `migrate --force`, seeds database records, refreshes route & configuration caches, and restarts workers.
+
+---
+
+## ⚙️ Running Locally
+
+### Prerequisites
+- Node.js 20+ & npm
+- PHP 8.4 (with `pdo_mysql` or `pdo_pgsql`) & Composer
+- MySQL 8.0+ or PostgreSQL 16+
+
+### Setup Steps
 ```bash
-cp docker.env.example .env      # add GROQ_API_KEY / GEMINI_API_KEY
-docker compose up --build
-```
-
-Frontend at `http://localhost:3000`, API at `http://localhost:8000`. Migrations run automatically.
-
-### Option B — Native
-
-Requires Node 20+, PHP 8.2+ (with `pdo_pgsql`), Composer, and PostgreSQL.
-
-```bash
+# 1. Install root & frontend dependencies
 npm install
+
+# 2. Install backend dependencies
 cd packages/backend
 composer install
-cp .env.example .env            # set DB_* and AI keys
+cp .env.example .env
+
+# 3. Configure .env with your DB credentials & AI keys
 php artisan key:generate
-php artisan migrate
+php artisan migrate --seed
 cd ../..
-npm run dev                     # starts backend (:8000) and frontend (:3000)
+
+# 4. Start local development server
+npm run dev
 ```
-
-### Environment Variables
-
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `APP_KEY` | backend | Laravel encryption key |
-| `DB_URL` or `DB_HOST`/`DB_PORT`/`DB_DATABASE`/`DB_USERNAME`/`DB_PASSWORD` | backend | PostgreSQL connection |
-| `AI_PROVIDER` | backend | `groq` or `gemini` |
-| `GROQ_API_KEY` / `GEMINI_API_KEY` / `GEMINI_MODEL` | backend | AI provider credentials |
-| `FIREBASE_API_KEY` | backend | Optional — defaults to the project's public web key; used to verify Firebase ID tokens |
-| `VITE_PEXELS_API_KEY` | frontend (build time) | Food/workout images |
 
 ---
 
-## 🚢 Deployment (Railway)
+## 👥 Development Team
 
-The Railway project `healthylife` has three services:
-
-- **`web`** — built from the root `Dockerfile`. One container serves both the API (`/api/*`) and the SPA (everything else). Migrations run on each boot.
-- **`Postgres`** — Railway Postgres; `web` connects via `DB_URL=${{Postgres.DATABASE_URL}}`.
-- **`policy-bot`** — the landing-page policy chatbot. It runs `rag-demo/rag_demo.ipynb` (RAG over the policy handbook) and serves it privately; `web` calls it via `RAG_API_URL=http://policy-bot.railway.internal:8001`. See [rag-demo/README.md](rag-demo/README.md).
-
-Deploy from your machine:
-
-```bash
-railway link          # select the healthylife project
-railway up --service web
-railway up ./rag-demo --path-as-root --service policy-bot
-```
-
-`web` service variables: `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, `DB_CONNECTION=pgsql`, `DB_URL`, `QUEUE_CONNECTION=sync`, `SESSION_DRIVER=file`, `CACHE_STORE=file`, `LOG_CHANNEL=stderr`, the AI keys above, and `VITE_PEXELS_API_KEY` (passed to the frontend build).
-
-**Firebase:** any new domain (e.g. a custom domain) must be added under Firebase console → Authentication → Settings → Authorized domains, or Google sign-in fails with `auth/unauthorized-domain`.
-
----
-
-## 👥 Team
-
-| Role | Member | GitHub |
-|------|--------|--------|
-| Team Lead | Aalvee Aarham | [@Aalvee-Aarham](https://github.com/Aalvee-Aarham) |
-| Developer | Farhana Mojumder Namira | [@tsunaami](https://github.com/tsunaami) |
-| Developer | Rubida Zakir Joya | [@Joyaaa-91](https://github.com/Joyaaa-91) |
-| Developer | Iftekhar | [@iftekhar141879](https://github.com/iftekhar141879) |
+| Roll | Member | GitHub | Responsibility |
+|---|---|---|---|
+| **20230204085** | **Aalvee Aarham** | [@Aalvee-Aarham](https://github.com/Aalvee-Aarham) | Team Lead, CI/CD Pipeline & VPS Deployment |
+| **20230204071** | **Farhana Mojumder Namira** | [@tsunaami](https://github.com/tsunaami) | Frontend Policy Hub & Integration Lead |
+| **20230204091** | **Rubaida Zakir Joya** | [@Joyaaa-91](https://github.com/Joyaaa-91) | MySQL Database Compatibility & Procedures |
+| **20230204079** | **Iftekhar** | [@iftekhar141879](https://github.com/iftekhar141879) | Policy Bot Backend, PDF Delivery & Seeders |

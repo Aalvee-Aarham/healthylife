@@ -17,6 +17,7 @@ import { ChatView } from './components/views/ChatView';
 import { CoachDashboardView } from './components/views/CoachDashboardView';
 import { PlanView } from './components/views/PlanView';
 import { AIAssistantView } from './components/views/AIAssistantView';
+import { PolicyView } from './components/views/PolicyView';
 import { SignInView } from './components/views/SignInView';
 import { SignUpView } from './components/views/SignUpView';
 import { SignOutView } from './components/views/SignOutView';
@@ -26,7 +27,7 @@ import { api, getAuthToken, setAuthToken } from './services/api';
 import { DailyMacros, MealItem } from './types';
 
 // Tabs a signed-out visitor may open. Every other tab is an authenticated route.
-const PUBLIC_TABS: NavigationTab[] = ['home', 'signin', 'signup', 'signout'];
+const PUBLIC_TABS: NavigationTab[] = ['home', 'signin', 'signup', 'signout', 'policy'];
 // Protected tabs available to every role, so they are safe to resume after sign-in.
 const RESUMABLE_TABS: NavigationTab[] = ['ai-assistant'];
 
@@ -327,6 +328,9 @@ export default function App() {
             {currentTab === 'ai-assistant' && (
               <AIAssistantView userRole={user.role} userName={user.name} />
             )}
+            {currentTab === 'policy' && (
+              <PolicyView />
+            )}
           </main>
         </div>
 
@@ -385,6 +389,10 @@ export default function App() {
             onSelectTab={navigate}
             onOpenAuthModal={() => setCurrentTab('signin')}
           />
+        )}
+
+        {currentTab === 'policy' && (
+          <PolicyView />
         )}
 
       </main>

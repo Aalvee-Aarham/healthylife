@@ -553,6 +553,7 @@ function LogMealModal({ category, onClose, onSaved, presets, presetsLoading, onC
         return;
       }
       const guessedCategory = (result.categoryGuess ?? result.category ?? category) as MealCategory;
+      const uploadedImageUrl = (result as { imageUrl?: string; image_url?: string }).imageUrl || (result as { imageUrl?: string; image_url?: string }).image_url;
       setReview({
         name: result.name,
         calories: String(result.calories ?? 0),
@@ -560,7 +561,7 @@ function LogMealModal({ category, onClose, onSaved, presets, presetsLoading, onC
         carbs: String(result.carbs ?? 0),
         fat: String(result.fat ?? 0),
         category: guessedCategory,
-        image: scanPreviewUrl || undefined,
+        image: uploadedImageUrl || scanPreviewUrl || undefined,
       });
     } catch {
       setScanError('Could not reach the scanner. Please try again or use Manual Entry.');
@@ -576,7 +577,7 @@ function LogMealModal({ category, onClose, onSaved, presets, presetsLoading, onC
     setFeedback(null);
     try {
       let image = draft.image;
-      if (!image) {
+      if (!image || image.startsWith('blob:')) {
         image = await fetchPexelsImage(draft.name).catch(() => undefined);
       }
       const payload = {

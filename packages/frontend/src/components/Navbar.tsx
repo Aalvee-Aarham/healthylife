@@ -3,6 +3,7 @@ import { NavigationTab, UserProfile } from '../types';
 import {
   Sparkles,
   Home,
+  FileText,
   Zap,
   LogIn,
   UserPlus,
@@ -97,6 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Public center nav — auth buttons are in the RIGHT action bar only (no duplicates)
   const publicNav: NavItem[] = [
     { id: 'home', label: 'Home', icon: Home },
+    { id: 'policy', label: 'Policies', icon: FileText },
     { id: 'ai-assistant', label: 'AI Advisor', icon: Zap, requiresAuth: true },
   ];
 
@@ -106,7 +108,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       id: user?.role === 'coach' ? 'coach-dashboard' : 'dashboard',
       label: user?.role === 'coach' ? 'Overview' : 'Dashboard',
       icon: LayoutDashboard
-    }
+    },
+    { id: 'policy', label: 'Policies', icon: FileText },
   ];
 
   const navItems = isLoggedIn && user ? loggedInNav : publicNav;

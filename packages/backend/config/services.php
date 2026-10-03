@@ -60,4 +60,11 @@ return [
         'ca_bundle' => env('AI_HTTP_CA_BUNDLE'),
     ],
 
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'dtcfaw16y'),
+        'api_key' => env('CLOUDINARY_API_KEY', '612343526971968'),
+        'api_secret' => env('CLOUDINARY_API_SECRET', '5wViM94-ckYM9H1Iy1xlvZ3HKLc'),
+    ],
+
 ];
+

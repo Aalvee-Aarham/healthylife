@@ -81,7 +81,14 @@ class PlanService
      */
     public function store(int $coachId, string $createdBy, array $data): array
     {
-        $rows = DB::select(
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement(
+                "UPDATE plans SET status = 'archived', updated_at = NOW() WHERE member_id = ? AND type = ? AND status = 'active'",
+                [$data['member_id'], $data['type']]
+            );
+        }
+
+        $row = \App\Support\DbHelper::insertReturningOne(
             "INSERT INTO plans (member_id, created_by, coach_id, type, title, status, week_start_date, content, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, 'active', ?, ?, NOW(), NOW())
              RETURNING *",
@@ -93,10 +100,11 @@ class PlanService
                 $data['title'],
                 $data['week_start_date'],
                 json_encode($data['content']),
-            ]
+            ],
+            'plans'
         );
 
-        return $this->format($rows[0]);
+        return $this->format($row);
     }
 
     /**
@@ -108,7 +116,14 @@ class PlanService
 
         $weekStart = now()->startOfWeek()->toDateString();
 
-        $rows = DB::select(
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement(
+                "UPDATE plans SET status = 'archived', updated_at = NOW() WHERE member_id = ? AND type = ? AND status = 'active'",
+                [$member->id, $type]
+            );
+        }
+
+        $row = \App\Support\DbHelper::insertReturningOne(
             "INSERT INTO plans (member_id, created_by, coach_id, type, title, status, week_start_date, content, created_at, updated_at)
              VALUES (?, 'ai', NULL, ?, ?, 'active', ?, ?, NOW(), NOW())
              RETURNING *",
@@ -118,10 +133,11 @@ class PlanService
                 $generated['title'] ?? (ucfirst($type).' Plan'),
                 $weekStart,
                 json_encode($generated),
-            ]
+            ],
+            'plans'
         );
 
-        return $this->format($rows[0]);
+        return $this->format($row);
     }
 
     private function memberContext(User $member): array

@@ -328,13 +328,15 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
 
   const activePeriod = periods.find(p => !p.ended_on);
   const todayStr = toDateString(new Date());
+  const [startedOn, setStartedOn] = useState(todayStr);
 
   const handleLogStart = async () => {
     setLogging(true);
     try {
-      await api.logPeriod({ started_on: todayStr, flow });
+      await api.logPeriod({ started_on: startedOn, flow });
       onRefresh();
       setShowForm(false);
+      setStartedOn(todayStr);
     } catch (e) {
       console.error(e);
     } finally {
@@ -355,7 +357,7 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
     }
   };
 
-  if (activePeriod) {
+  if (activePeriod && !showForm) {
     const startDays = daysFromNow(activePeriod.started_on);
     const daysAgo = startDays !== null ? Math.abs(startDays) : 0;
     return (
@@ -391,6 +393,16 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
             {ending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
             Mark Period as Ended
           </button>
+          {/* Forgot to end it? A new period auto-closes this one (trg_cycle_periods_close_previous). */}
+          {activePeriod.started_on < todayStr && (
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all"
+              style={{ background: '#E8445A', color: '#fff' }}
+            >
+              Start New Period
+            </button>
+          )}
         </div>
       </div>
     );
@@ -399,6 +411,23 @@ const PeriodLogger: React.FC<PeriodLoggerProps> = ({ status, periods, onRefresh 
   if (showForm) {
     return (
       <div className="space-y-3">
+        {activePeriod && (
+          <p className="text-[11px]" style={{ color: 'var(--hl-text-tertiary)' }}>
+            Your ongoing period from {formatDate(activePeriod.started_on)} will be closed automatically.
+          </p>
+        )}
+        <label className="block text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
+          Started on
+          <input
+            type="date"
+            value={startedOn}
+            min={activePeriod?.started_on}
+            max={todayStr}
+            onChange={e => setStartedOn(e.target.value || todayStr)}
+            className="mt-1 w-full rounded-xl p-2 text-xs border"
+            style={{ background: 'var(--hl-surface-alt)', borderColor: 'var(--hl-border-light)', color: 'var(--hl-text-primary)' }}
+          />
+        </label>
         <p className="text-xs font-semibold" style={{ color: 'var(--hl-text-secondary)' }}>
           How heavy is your flow?
         </p>

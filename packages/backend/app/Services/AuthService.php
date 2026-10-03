@@ -49,7 +49,7 @@ class AuthService
             ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400'
             : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
 
-        $rows = DB::select(
+        $userId = \App\Support\DbHelper::insertReturningId(
             "INSERT INTO users
                 (name, email, password, role, gender, avatar,
                  weight_current_kg, weight_target_kg, height_cm, age,
@@ -80,8 +80,6 @@ class AuthService
                 $validated['body_type'] ?? null,
             ]
         );
-
-        $userId = $rows[0]->id;
         $user = User::find($userId);
         $token = $user->createToken('api')->plainTextToken;
 
@@ -101,7 +99,7 @@ class AuthService
             ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400'
             : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400';
 
-        $rows = DB::select(
+        $userId = \App\Support\DbHelper::insertReturningId(
             "INSERT INTO users
                 (name, email, password, role, gender, avatar, coach_specialty, title,
                  created_at, updated_at)
@@ -117,8 +115,6 @@ class AuthService
                 $validated['title'] ?? ucfirst($validated['coach_specialty']),
             ]
         );
-
-        $userId = $rows[0]->id;
         $user = User::find($userId);
         $token = $user->createToken('api')->plainTextToken;
 
@@ -141,7 +137,7 @@ class AuthService
         $existing = DB::selectOne('SELECT id FROM users WHERE email = ?', [$email]);
 
         if (! $existing) {
-            $rows = DB::select(
+            $userId = \App\Support\DbHelper::insertReturningId(
                 'INSERT INTO users
                     (name, email, password, role, coach_specialty, title, gender, avatar,
                      weight_current_kg, weight_target_kg, height_cm, age,
@@ -172,8 +168,6 @@ class AuthService
                     $validated['water_goal_ml'] ?? ($gender === 'male' ? 3500 : 3000),
                 ]
             );
-
-            $userId = $rows[0]->id;
             // No auto coach assignment — see registerMember() note above.
         } else {
             $userId = $existing->id;

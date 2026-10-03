@@ -40,14 +40,13 @@ class WaterLogService
 
     public function store(int $userId, int $amountMl, int $goalMl): array
     {
-        $rows = DB::select(
+        $log = \App\Support\DbHelper::insertReturningOne(
             'INSERT INTO water_logs (user_id, amount_ml, logged_at, created_at, updated_at)
              VALUES (?, ?, NOW(), NOW(), NOW())
              RETURNING *',
-            [$userId, $amountMl]
+            [$userId, $amountMl],
+            'water_logs'
         );
-
-        $log = $rows[0];
 
         $totalRow = DB::selectOne(
             'SELECT COALESCE(SUM(amount_ml), 0) AS total_ml

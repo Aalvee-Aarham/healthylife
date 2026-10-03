@@ -26,16 +26,18 @@ class GymLogService
         // View: v_workout_stats (no row = no workouts yet)
         $row = DB::selectOne('SELECT * FROM v_workout_stats WHERE user_id = ?', [$userId]);
 
+        $dateExpr = DB::getDriverName() === 'mysql' ? 'DATE(logged_at)' : 'logged_at::date';
+        $completedVal = DB::getDriverName() === 'mysql' ? '1' : 'true';
         $consistentDays = DB::select(
-            'SELECT logged_at::date AS activity_date
+            "SELECT {$dateExpr} AS activity_date
              FROM gym_logs
              WHERE user_id = ?
              INTERSECT
-             SELECT logged_at::date AS activity_date
+             SELECT {$dateExpr} AS activity_date
              FROM meals
-             WHERE user_id = ? AND completed = true
+             WHERE user_id = ? AND completed = {$completedVal}
              ORDER BY activity_date DESC
-             LIMIT 7',
+             LIMIT 7",
             [$userId, $userId]
         );
 
@@ -56,8 +58,8 @@ class GymLogService
             : now()->toDateTimeString();
 
         // Procedure: sp_log_workout inserts the log and all its sets, returning the new id.
-        $logId = DB::selectOne(
-            'CALL sp_log_workout(?, ?, ?, ?, ?, ?, ?, NULL)',
+        $logId = (int) \App\Support\DbProcedure::call(
+            'sp_log_workout',
             [
                 $userId,
                 $data['title'],
@@ -66,8 +68,9 @@ class GymLogService
                 $data['notes'] ?? null,
                 $loggedAt,
                 json_encode($data['sets'] ?? []),
-            ]
-        )->p_log_id;
+            ],
+            'p_log_id'
+        );
 
         return $this->find($logId);
     }

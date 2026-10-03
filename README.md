@@ -97,6 +97,6 @@ npm run dev
 | Roll | Member | GitHub | Responsibility |
 |---|---|---|---|
 | **20230204085** | **Aalvee Aarham** | [@Aalvee-Aarham](https://github.com/Aalvee-Aarham) | Team Lead, CI/CD Pipeline & VPS Deployment |
-| **20230204071** | **Farhana Mojumder Namira** | [@tsunaami](https://github.com/tsunaami) | Frontend Policy Hub & Integration Lead |
+| **20230204079** | **Farhana Mojumder Namira** | [@tsunaami](https://github.com/tsunaami) | Frontend Policy Hub & Integration Lead |
 | **20230204091** | **Rubaida Zakir Joya** | [@Joyaaa-91](https://github.com/Joyaaa-91) | MySQL Database Compatibility & Procedures |
-| **20230204079** | **Iftekhar** | [@iftekhar141879](https://github.com/iftekhar141879) | Policy Bot Backend, PDF Delivery & Seeders |
+| **20230104080** | **Iftekhar** | [@iftekhar141879](https://github.com/iftekhar141879) | Policy Bot Backend, PDF Delivery & Seeders |

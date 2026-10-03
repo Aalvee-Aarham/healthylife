@@ -30,6 +30,14 @@ class MealController extends Controller
 
     public function store(Request $request)
     {
+        $input = $request->all();
+        if (isset($input['image'])) {
+            if (str_starts_with($input['image'], 'blob:') || ! filter_var($input['image'], FILTER_VALIDATE_URL)) {
+                $input['image'] = null;
+            }
+        }
+        $request->merge($input);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'calories' => 'required|integer',
@@ -37,7 +45,7 @@ class MealController extends Controller
             'carbs' => 'required|integer',
             'fat' => 'required|integer',
             'category' => 'required|string|in:breakfast,lunch,dinner,snack',
-            'image' => 'nullable|url',
+            'image' => 'nullable|string|max:1000',
             'logged_at' => 'nullable|date',
             'source' => 'nullable|string|in:manual,ai_text,ai_scan',
             'ai_confidence' => 'nullable|numeric|between:0,1',
@@ -94,6 +102,14 @@ class MealController extends Controller
         $base64 = base64_encode(file_get_contents($file->getRealPath()));
         $mimeType = $file->getMimeType() ?: 'image/jpeg';
 
-        return response()->json($this->aiService->scanFoodImage($base64, $mimeType));
+        $draft = $this->aiService->scanFoodImage($base64, $mimeType);
+
+        $imageUrl = app(\App\Services\CloudinaryService::class)->uploadFile($file->getRealPath());
+        if ($imageUrl) {
+            $draft['imageUrl'] = $imageUrl;
+            $draft['image_url'] = $imageUrl;
+        }
+
+        return response()->json($draft);
     }
 }

@@ -12,14 +12,14 @@ class GroqProvider implements AIProviderInterface
     private const ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 
     // Primary text model — fast & powerful.
-    private const MODEL_PRIMARY = 'llama-3.3-70b-versatile';
+    private const MODEL_PRIMARY = 'openai/gpt-oss-120b';
 
     // Fallback text model if the primary is rate-limited or errors.
-    private const MODEL_FALLBACK = 'llama3-8b-8192';
+    private const MODEL_FALLBACK = 'openai/gpt-oss-20b';
 
-    // Current Groq vision-capable model (llama-4-scout multimodal preview family)
-    // used for food-photo analysis — swap here if Groq deprecates it.
-    private const MODEL_VISION = 'meta-llama/llama-4-scout-17b-16e-instruct';
+    // Current Groq vision-capable model, used for food-photo analysis.
+    // Swap here if Groq deprecates it (GET /openai/v1/models lists what's live).
+    private const MODEL_VISION = 'qwen/qwen3.8-27b';
 
     public function __construct(private readonly ?string $apiKey) {}
 

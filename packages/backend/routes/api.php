@@ -20,7 +20,8 @@ Route::post('/auth/login',    [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/firebase', [AuthController::class, 'firebaseAuth']);
 Route::get('/stats',          [DashboardController::class, 'publicStats']);
-Route::post('/policy/ask',    [PolicyBotController::class, 'ask'])->middleware('throttle:10,1');
+Route::post('/policy/ask',    [PolicyBotController::class, 'ask'])->middleware('throttle:20,1');
+Route::get('/policy/pdf',     [PolicyBotController::class, 'pdf']);
 
 // ── Protected routes (Sanctum token) ─────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {

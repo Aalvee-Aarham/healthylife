@@ -31,7 +31,7 @@ class MealPlanService
         $carbs = $data['carbs'] ?? (int) round($data['calories'] * 0.45 / 4);
         $fat = $data['fat'] ?? (int) round($data['calories'] * 0.30 / 9);
 
-        $rows = DB::select(
+        $row = \App\Support\DbHelper::insertReturningOne(
             'INSERT INTO meal_plans
                 (user_id, day_of_week, meal_time, name, calories, protein, carbs, fat, image, notes, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
@@ -47,10 +47,11 @@ class MealPlanService
                 $fat,
                 $data['image'] ?? null,
                 $data['notes'] ?? null,
-            ]
+            ],
+            'meal_plans'
         );
 
-        return $this->format($rows[0]);
+        return $this->format($row);
     }
 
     public function update(int $userId, int $mealPlanId, array $data): array

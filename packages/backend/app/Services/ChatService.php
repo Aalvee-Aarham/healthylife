@@ -153,14 +153,12 @@ class ChatService
             403
         );
 
-        $rows = DB::select(
+        $msg = \App\Support\DbHelper::insertReturningOne(
             'INSERT INTO chat_messages (conversation_id, sender_id, body, created_at, updated_at)
              VALUES (?, ?, ?, NOW(), NOW())
              RETURNING id, sender_id, body, created_at',
             [$conversationId, $user->id, $body]
         );
-
-        $msg = $rows[0];
         $userId = $user->id;
 
         return [

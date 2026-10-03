@@ -21,7 +21,7 @@ class MealPresetService
 
     public function store(int $userId, array $data): array
     {
-        $rows = DB::select(
+        $row = \App\Support\DbHelper::insertReturningOne(
             'INSERT INTO meal_presets (user_id, name, calories, protein, carbs, fat, category, image, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
              RETURNING *',
@@ -34,10 +34,11 @@ class MealPresetService
                 $data['fat'],
                 $data['category'],
                 $data['image'] ?? null,
-            ]
+            ],
+            'meal_presets'
         );
 
-        return $this->format($rows[0]);
+        return $this->format($row);
     }
 
     public function destroy(int $userId, int $presetId): void

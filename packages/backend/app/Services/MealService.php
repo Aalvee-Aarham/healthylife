@@ -69,7 +69,7 @@ class MealService
             ? Carbon::parse($validated['logged_at'])->toDateTimeString()
             : now()->toDateTimeString();
 
-        $rows = DB::select(
+        $row = \App\Support\DbHelper::insertReturningOne(
             'INSERT INTO meals
                 (user_id, name, calories, protein, carbs, fat, category, image, logged_at, completed, source, ai_confidence, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, NOW(), NOW())
@@ -86,10 +86,11 @@ class MealService
                 $loggedAt,
                 $validated['source'] ?? 'manual',
                 $validated['ai_confidence'] ?? null,
-            ]
+            ],
+            'meals'
         );
 
-        return $this->format($rows[0]);
+        return $this->format($row);
     }
 
     public function update(int $userId, int $mealId, array $data): array

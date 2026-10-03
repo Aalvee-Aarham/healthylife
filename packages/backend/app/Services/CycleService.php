@@ -127,7 +127,7 @@ class CycleService
     public function logPeriod(int $userId, string $startedOn, string $flow): array
     {
         // Procedure: sp_log_period upserts on (user_id, started_on).
-        $periodId = DB::selectOne('CALL sp_log_period(?, ?, ?, NULL)', [$userId, $startedOn, $flow])->p_period_id;
+        $periodId = (int) \App\Support\DbProcedure::call('sp_log_period', [$userId, $startedOn, $flow], 'p_period_id');
         $period = DB::selectOne('SELECT * FROM cycle_periods WHERE id = ?', [$periodId]);
 
         return [
@@ -204,7 +204,7 @@ class CycleService
     public function toggleSymptom(int $userId, string $symptomKey, string $date): array
     {
         // Procedure: sp_toggle_symptom deletes the log if present, else inserts it.
-        $active = (bool) DB::selectOne('CALL sp_toggle_symptom(?, ?, ?, NULL)', [$userId, $symptomKey, $date])->p_active;
+        $active = (bool) \App\Support\DbProcedure::call('sp_toggle_symptom', [$userId, $symptomKey, $date], 'p_active');
 
         return [
             'symptom_key' => $symptomKey,

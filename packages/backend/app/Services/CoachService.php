@@ -54,10 +54,11 @@ class CoachService
         // so a failure never leaves the member with their old coach deleted and no new one.
         $assignmentId = DB::transaction(function () use ($memberId, $coachId, $specialty, $coach) {
             // Procedure: sp_assign_coach swaps out the old assignment for this specialty.
-            $assignmentId = DB::selectOne(
-                'CALL sp_assign_coach(?, ?, ?, NULL)',
-                [$memberId, $coachId, $specialty]
-            )->p_assignment_id;
+            $assignmentId = \App\Support\DbProcedure::call(
+                'sp_assign_coach',
+                [$memberId, $coachId, $specialty],
+                'p_assignment_id'
+            );
 
             $member = DB::selectOne('SELECT name FROM users WHERE id = ?', [$memberId]);
 
@@ -120,16 +121,34 @@ class CoachService
         );
 
         // View: v_daily_intake, gap-filled so days with nothing logged show as zero.
-        $intake = DB::select(
-            'SELECT d::date AS day,
-                    COALESCE(i.calories, 0) AS calories, COALESCE(i.protein, 0) AS protein,
-                    COALESCE(i.carbs, 0) AS carbs, COALESCE(i.fat, 0) AS fat,
-                    COALESCE(i.meal_count, 0) AS meal_count, COALESCE(i.water_ml, 0) AS water_ml
-             FROM generate_series(CURRENT_DATE - 6, CURRENT_DATE, INTERVAL \'1 day\') d
-             LEFT JOIN v_daily_intake i ON i.user_id = ? AND i.day = d::date
-             ORDER BY day',
-            [$memberId]
-        );
+        if (DB::getDriverName() === 'mysql') {
+            $intake = DB::select(
+                'WITH RECURSIVE days AS (
+                    SELECT CURDATE() - INTERVAL 6 DAY AS day
+                    UNION ALL
+                    SELECT day + INTERVAL 1 DAY FROM days WHERE day < CURDATE()
+                 )
+                 SELECT d.day,
+                        COALESCE(i.calories, 0) AS calories, COALESCE(i.protein, 0) AS protein,
+                        COALESCE(i.carbs, 0) AS carbs, COALESCE(i.fat, 0) AS fat,
+                        COALESCE(i.meal_count, 0) AS meal_count, COALESCE(i.water_ml, 0) AS water_ml
+                 FROM days d
+                 LEFT JOIN v_daily_intake i ON i.user_id = ? AND i.day = d.day
+                 ORDER BY day',
+                [$memberId]
+            );
+        } else {
+            $intake = DB::select(
+                'SELECT d::date AS day,
+                        COALESCE(i.calories, 0) AS calories, COALESCE(i.protein, 0) AS protein,
+                        COALESCE(i.carbs, 0) AS carbs, COALESCE(i.fat, 0) AS fat,
+                        COALESCE(i.meal_count, 0) AS meal_count, COALESCE(i.water_ml, 0) AS water_ml
+                 FROM generate_series(CURRENT_DATE - 6, CURRENT_DATE, INTERVAL \'1 day\') d
+                 LEFT JOIN v_daily_intake i ON i.user_id = ? AND i.day = d::date
+                 ORDER BY day',
+                [$memberId]
+            );
+        }
 
         $int = fn ($v) => $v === null ? null : (int) $v;
 
@@ -206,14 +225,27 @@ class CoachService
         // Transaction: the upsert below row-locks the conversation until commit, so two
         // simultaneous calls can't both see 0 messages and post the welcome twice.
         return DB::transaction(function () use ($memberId, $coachId, $memberName, $coachSpecialty) {
-            $convRows = DB::select(
-                'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
-                 VALUES (?, ?, NOW(), NOW())
-                 ON CONFLICT (member_id, coach_id) DO UPDATE SET updated_at = conversations.updated_at
-                 RETURNING id',
-                [$memberId, $coachId]
-            );
-            $convId = $convRows[0]->id;
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement(
+                    'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
+                     VALUES (?, ?, NOW(), NOW())
+                     ON DUPLICATE KEY UPDATE updated_at = updated_at',
+                    [$memberId, $coachId]
+                );
+                $convId = DB::selectOne(
+                    'SELECT id FROM conversations WHERE member_id = ? AND coach_id = ?',
+                    [$memberId, $coachId]
+                )->id;
+            } else {
+                $convRows = DB::select(
+                    'INSERT INTO conversations (member_id, coach_id, created_at, updated_at)
+                     VALUES (?, ?, NOW(), NOW())
+                     ON CONFLICT (member_id, coach_id) DO UPDATE SET updated_at = conversations.updated_at
+                     RETURNING id',
+                    [$memberId, $coachId]
+                );
+                $convId = $convRows[0]->id;
+            }
 
             $msgCount = DB::selectOne(
                 'SELECT COUNT(*) AS cnt FROM chat_messages WHERE conversation_id = ?',

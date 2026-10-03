@@ -20,6 +20,7 @@ metadata.json
 *.md
 !README.md
 !COMMIT_PLAN.md
+!CI_CD_VPS_DEPLOYMENT_GUIDE.md
 *.docx
 .venv/
 s20230204085*

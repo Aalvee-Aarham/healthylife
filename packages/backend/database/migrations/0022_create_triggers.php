@@ -7,6 +7,32 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'mysql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS trg_meals_uncheck_plan_item;');
+            DB::unprepared("
+                CREATE TRIGGER trg_meals_uncheck_plan_item
+                BEFORE DELETE ON meals
+                FOR EACH ROW
+                BEGIN
+                    UPDATE plan_completions SET completed_at = NULL, meal_id = NULL, updated_at = NOW()
+                    WHERE meal_id = OLD.id;
+                END;
+            ");
+
+            DB::unprepared('DROP TRIGGER IF EXISTS trg_gym_logs_uncheck_plan_item;');
+            DB::unprepared("
+                CREATE TRIGGER trg_gym_logs_uncheck_plan_item
+                BEFORE DELETE ON gym_logs
+                FOR EACH ROW
+                BEGIN
+                    UPDATE plan_completions SET completed_at = NULL, gym_log_id = NULL, updated_at = NOW()
+                    WHERE gym_log_id = OLD.id;
+                END;
+            ");
+
+            return;
+        }
+
         // A new active plan archives the member's previous active plan of the same type,
         // so there's only ever one active nutrition + one active workout plan.
         DB::unprepared("
@@ -70,6 +96,14 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'mysql') {
+            DB::unprepared('
+                DROP TRIGGER IF EXISTS trg_gym_logs_uncheck_plan_item;
+                DROP TRIGGER IF EXISTS trg_meals_uncheck_plan_item;
+            ');
+            return;
+        }
+
         DB::unprepared('
             DROP TRIGGER IF EXISTS trg_cycle_periods_close_previous ON cycle_periods;
             DROP TRIGGER IF EXISTS trg_gym_logs_uncheck_plan_item ON gym_logs;

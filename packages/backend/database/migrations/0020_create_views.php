@@ -7,6 +7,96 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'mysql') {
+            DB::unprepared("
+                CREATE OR REPLACE VIEW v_daily_intake AS
+                SELECT
+                    user_id,
+                    day,
+                    SUM(calories)    AS calories,
+                    SUM(protein)     AS protein,
+                    SUM(carbs)       AS carbs,
+                    SUM(fat)         AS fat,
+                    COUNT(meal_id)   AS meal_count,
+                    SUM(water_ml)    AS water_ml
+                FROM (
+                    SELECT user_id, DATE(logged_at) AS day, id AS meal_id, calories, protein, carbs, fat, 0 AS water_ml
+                    FROM meals
+                    WHERE completed = 1
+                    UNION ALL
+                    SELECT user_id, DATE(logged_at) AS day, NULL AS meal_id, 0 AS calories, 0 AS protein, 0 AS carbs, 0 AS fat, amount_ml AS water_ml
+                    FROM water_logs
+                ) intake
+                GROUP BY user_id, day;
+            ");
+
+            DB::unprepared("
+                CREATE OR REPLACE VIEW v_gym_logs_with_sets AS
+                SELECT
+                    gl.id,
+                    gl.user_id,
+                    gl.title,
+                    gl.duration_minutes,
+                    gl.calories_burned,
+                    gl.notes,
+                    gl.logged_at,
+                    CASE WHEN COUNT(gls.id) = 0 THEN JSON_ARRAY()
+                    ELSE JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'id',           gls.id,
+                            'exerciseName', gls.exercise_name,
+                            'setNumber',    gls.set_number,
+                            'reps',         gls.reps,
+                            'weightKg',     gls.weight_kg,
+                            'completed',    IF(gls.completed = 1, true, false)
+                        )
+                    ) END AS sets_json
+                FROM gym_logs gl
+                LEFT JOIN gym_log_sets gls ON gls.gym_log_id = gl.id
+                GROUP BY gl.id, gl.user_id, gl.title, gl.duration_minutes, gl.calories_burned, gl.notes, gl.logged_at;
+            ");
+
+            DB::unprepared("
+                CREATE OR REPLACE VIEW v_workout_stats AS
+                SELECT
+                    gl.user_id,
+                    COUNT(*)                              AS total_workouts,
+                    COALESCE(SUM(s.set_count), 0)         AS total_sets,
+                    COALESCE(SUM(gl.duration_minutes), 0) AS total_duration_minutes,
+                    COALESCE(SUM(gl.calories_burned), 0)  AS total_calories_burned,
+                    COALESCE(AVG(gl.duration_minutes), 0) AS avg_session_minutes
+                FROM gym_logs gl
+                LEFT JOIN (
+                    SELECT gym_log_id, COUNT(*) AS set_count
+                    FROM gym_log_sets
+                    GROUP BY gym_log_id
+                ) s ON s.gym_log_id = gl.id
+                GROUP BY gl.user_id;
+            ");
+
+            DB::unprepared("
+                CREATE OR REPLACE VIEW v_client_adherence AS
+                SELECT
+                    u.id                                   AS member_id,
+                    COUNT(p.id)                            AS active_plans,
+                    COALESCE(SUM(COALESCE(JSON_LENGTH(JSON_EXTRACT(p.content, '$.days')), 0)), 0) AS planned_items,
+                    COUNT(pc.id)                           AS completed_items,
+                    CASE WHEN COUNT(pc.id) > 0 THEN 100 ELSE 0 END AS adherence_pct,
+                    GREATEST(
+                        COALESCE((SELECT MAX(logged_at) FROM meals      WHERE user_id = u.id), '1970-01-01 00:00:00'),
+                        COALESCE((SELECT MAX(logged_at) FROM gym_logs   WHERE user_id = u.id), '1970-01-01 00:00:00'),
+                        COALESCE((SELECT MAX(logged_at) FROM water_logs WHERE user_id = u.id), '1970-01-01 00:00:00')
+                    ) AS last_active_at
+                FROM users u
+                LEFT JOIN plans p ON p.member_id = u.id AND p.status = 'active'
+                LEFT JOIN plan_completions pc ON pc.plan_id = p.id AND pc.completed_at IS NOT NULL
+                WHERE u.role = 'member'
+                GROUP BY u.id;
+            ");
+
+            return;
+        }
+
         // Per-user, per-day intake: meals (completed only) + water, via UNION ALL then SUM/COUNT.
         // Used by DashboardService::summary().
         DB::unprepared("
